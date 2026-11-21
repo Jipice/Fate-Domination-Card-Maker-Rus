@@ -87,16 +87,18 @@ const CommandSeal = ({ form, isPreview }: props) => {
                 lineHeight: 1.1,
               }}
             >
+              <span>Выбери один эффект:</span>
               <span>
-                <span className="font-semibold">Действие</span>: Gain +4 Mana
+                <span className="font-semibold">Действие</span>: Получи +4 Маны.
               </span>
               <span>
-                <span className="font-semibold">Действие</span>: Gain +2 total
-                power. Gain 2 VP if you win combat this round.
+                <span className="font-semibold">Действие</span>: Получи +2 к
+                общей силе. Если ты победил в сражении в этом раунде, получи 2
+                ПО.
               </span>
               <span>
-                <span className="font-semibold">Действие</span>: Move anywhere
-                from Miyama or Shinto ignoring engagement.
+                <span className="font-semibold">Действие</span>: Переместись из
+                [Миима] или [Синто] куда угодно, игнорируя столкновение.
               </span>
             </div>
           </div>
