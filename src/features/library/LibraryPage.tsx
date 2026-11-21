@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, DragEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   FaChevronDown,
@@ -90,6 +90,38 @@ function flatFolders(folders: FolderRecord[]): { folder: FolderRecord; depth: nu
   return out;
 }
 
+
+// Accepts a library export ({ record: {...} }), a plain library record,
+// or a card saved from the editor's "Сохранить" button (just the form).
+function parseImport(data: unknown): {
+  page: PageKey;
+  name: string;
+  form: Record<string, unknown>;
+  thumbnail: string | null;
+} | null {
+  if (!data || typeof data !== "object") return null;
+  const obj = data as Record<string, unknown>;
+  const record = (obj.record ?? obj) as Record<string, unknown>;
+
+  if (typeof record.page === "string" && record.page in PAGE_INFO && record.form && typeof record.form === "object") {
+    const page = record.page as PageKey;
+    return {
+      page,
+      name: String(record.name || PAGE_INFO[page].label),
+      form: record.form as Record<string, unknown>,
+      thumbnail: typeof record.thumbnail === "string" ? record.thumbnail : null,
+    };
+  }
+
+  // editor JSON: the form itself
+  if ("cardToMake" in record) {
+    const page: PageKey = record.cardToMake === "servant" ? "servant-card" : "master-card";
+    const name = String(record.masterName || record.name || PAGE_INFO[page].label);
+    return { page, name, form: record, thumbnail: null };
+  }
+  return null;
+}
+
 const LibraryPage = () => {
   const [cards, setCards] = useState<CardRecord[]>([]);
   const [folders, setFolders] = useState<FolderRecord[]>([]);
@@ -99,6 +131,7 @@ const LibraryPage = () => {
   const [sort, setSort] = useState<SortKey>("date-desc");
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const reload = async () => {
     setCards(await listCards());
@@ -238,25 +271,27 @@ const LibraryPage = () => {
     reader.onload = async () => {
       try {
         const data = JSON.parse(String(reader.result));
-        const record = data.record ?? data;
-        if (!record || !(record.page in PAGE_INFO) || typeof record.form !== "object") {
-          throw new Error("bad file");
+        const parsed = parseImport(data);
+        if (!parsed) {
+          setMessage("Этот файл не похож на карту: нужен JSON из библиотеки или из кнопки «Сохранить» в редакторе");
+          return;
         }
         await putCard({
           id: crypto.randomUUID(),
-          page: record.page,
-          name: String(record.name || PAGE_INFO[record.page as PageKey].label),
+          page: parsed.page,
+          name: parsed.name,
           savedAt: Date.now(),
-          form: record.form,
+          form: parsed.form,
           folderId: null,
-          thumbnail: record.thumbnail ?? null,
+          thumbnail: parsed.thumbnail,
         });
-        setMessage("Карта добавлена в библиотеку");
+        setMessage(`Карта «${parsed.name}» добавлена в библиотеку`);
         reload();
       } catch {
-        setMessage("Не удалось прочитать файл");
+        setMessage("Не удалось прочитать файл: он повреждён или это не JSON");
       }
     };
+    reader.onerror = () => setMessage("Не удалось открыть файл");
     reader.readAsText(file);
   };
 
@@ -311,10 +346,16 @@ const LibraryPage = () => {
     <div className="flex flex-col gap-4 w-full max-w-5xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">Библиотека карт</h1>
-        <label className={`${buttonClass} cursor-pointer`}>
+        <button className={buttonClass} onClick={() => fileInput.current?.click()}>
           Импорт JSON
-          <input type="file" accept=".json" onChange={importFile} hidden />
-        </label>
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          onChange={importFile}
+          className="hidden"
+        />
       </div>
 
       {message && <p className="italic">{message}</p>}
