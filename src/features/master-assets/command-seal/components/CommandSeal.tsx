@@ -81,10 +81,10 @@ const CommandSeal = ({ form, isPreview }: props) => {
               {form.name}
             </div>
             <div
-              className="absolute flex flex-col top-[845px] left-[33px] text-[32px] w-[680px]"
+              className="absolute flex flex-col top-[845px] left-[33px] text-[26px] w-[680px]"
               style={{
                 fontFamily: '"Times New Roman"',
-                lineHeight: 1.1,
+                lineHeight: 1.05,
               }}
             >
               <span>Выбери один эффект:</span>
