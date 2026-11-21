@@ -96,13 +96,13 @@ export const ServantSummon = ({ form, isPreview }: ServantSummonProps) => {
 
             {/* Traits */}
             <div
-              className=" flex justify-center mb-3"
+              className=" flex justify-center mb-3 text-center"
               style={{
-                fontSize: 32,
+                fontSize: 26,
                 fontFamily: '"Times New Roman"',
               }}
             >
-              <div className="text-white">
+              <div className="text-white text-center max-w-[680px]">
                 {form.traits.length == 1
                   ? form.traits[0]
                   : form.traits.join(" " + "\u00B7" + " ")}
@@ -111,13 +111,13 @@ export const ServantSummon = ({ form, isPreview }: ServantSummonProps) => {
 
             {/* Drawbacks */}
             <div
-              className=" flex justify-center italic"
+              className=" flex justify-center italic text-center"
               style={{
-                fontSize: 32,
+                fontSize: 26,
                 fontFamily: '"Times New Roman"',
               }}
             >
-              <div className="text-[#a6a6a6]">
+              <div className="text-[#a6a6a6] text-center max-w-[680px]">
                 {form.drawbacks.length == 1
                   ? form.drawbacks[0]
                   : form.drawbacks.join(" " + "\u00B7" + " ")}
