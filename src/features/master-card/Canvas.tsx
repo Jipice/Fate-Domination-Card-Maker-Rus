@@ -1,0 +1,499 @@
+"use client";
+
+import { servantCardType } from "@/src/types/servantTypes";
+import shortNameMasterTemplate from "./images/master-template-short.png";
+import mediumNameMasterTemplate from "./images/master-template-medium.png";
+import longNameMasterTemplate from "./images/master-template-long.png";
+import shortNameTextlessTemplate from "./images/textless-template-short.png";
+import mediumNameTextlessTemplate from "./images/textless-template-medium.png";
+import longNameTextlessTemplate from "./images/textless-template-long.png";
+import shortNameTextlessBlackTemplate from "./images/textless-black-short.png";
+import mediumNameTextlessBlackTemplate from "./images/textless-black-medium.png";
+import longNameTextlessBlackTemplate from "./images/textless-black-long.png";
+import {
+  AttackTypes,
+  formInput,
+  MAIN_CARD,
+  mainCardType,
+} from "@/src/features/master-card/types/formTypes";
+import { ATTACK_TYPES } from "@/src/constants/servantConstants";
+import { StaticImageData } from "next/image";
+import {
+  IMAGE_CROP_SETTINGS,
+  IMAGE_CROP_VALUES,
+} from "@/src/constants/cropConstants";
+import { NAME_FIELD_SIZES } from "@/src/constants/formConstants";
+
+const TEXTLESS_BLACK_SPACING = 50;
+
+function getCardIcon(key: string) {
+  switch (key.toLowerCase().replaceAll(' ', '')) {
+    case "strength":
+      return "./attack-types-text/strength.png";
+    case "agility":
+      return "./attack-types-text/agility.png";
+    case "magic":
+      return "./attack-types-text/magic.png";
+    case "special":
+      return "./attack-types-text/special.png";
+    case "noblephantasm":
+      return "./attack-types-text/noblephantasm.png";
+  }
+}
+
+function getServantChunked(servantCards: servantCardType[]) {
+  const chunk_size = getServantSplitCount(servantCards);
+  const chunked = [];
+  for (let i = 0; i < servantCards.length; i += chunk_size) {
+    chunked.push(servantCards.slice(i, i + chunk_size));
+  }
+  return chunked;
+}
+
+function getServantSplitCount(servantCards: servantCardType[]) {
+  return servantCards.length >= 7 ? 4 : 3;
+}
+
+function AbilityText({
+  text,
+  revealServantName,
+  timesPerGame,
+}: {
+  text: string;
+  revealServantName: boolean;
+  timesPerGame: number | null;
+}) {
+  let extraTop = 0;
+  const needExtraLine = revealServantName || timesPerGame;
+  if (needExtraLine) {
+    extraTop = 33;
+  }
+  let timesPerGameText = "";
+  if (timesPerGame) {
+    switch (timesPerGame) {
+      case 1:
+        timesPerGameText = "<Once per Game>";
+        break;
+      case 2:
+        timesPerGameText = "<Twice per Game>";
+        break;
+      case 3:
+        timesPerGameText = "<Thrice per Game>";
+        break;
+      default:
+        if (timesPerGame) {
+          timesPerGameText = `<${timesPerGame} Times per Game>`;
+        }
+    }
+  }
+
+  return (
+    <>
+      {needExtraLine && (
+        <div
+          className="absolute break-words flex justify-between"
+          style={{
+            left: 33,
+            top: 845,
+            width: 680,
+            fontFamily: '"Times New Roman"',
+            lineHeight: 1.1,
+            fontSize: 30,
+          }}
+        >
+          {revealServantName && (
+            <span className="reveal-servant-name-color">
+              [Reveal Servant Name]
+            </span>
+          )}
+          {timesPerGame && (
+            <span className="text-white font-bold">{timesPerGameText}</span>
+          )}
+        </div>
+      )}
+      <div
+        className="absolute text-white break-words"
+        style={{
+          left: 33,
+          top: 845 + extraTop,
+          width: 680,
+          fontFamily: '"Times New Roman"',
+          lineHeight: 1.1,
+        }}
+        dangerouslySetInnerHTML={{ __html: text }}
+      ></div>
+    </>
+  );
+}
+
+type CardProps = {
+  form: formInput;
+  isPreview: boolean;
+  cardType: MAIN_CARD;
+};
+
+function getTextlessOffset(
+  cardType: mainCardType,
+  blackTextlessTypes: AttackTypes,
+) {
+  let verticalOffset = 0;
+  let horizontalOffset = 0;
+  if (cardType == MAIN_CARD.textless) {
+    verticalOffset = 189;
+  } else if (cardType == MAIN_CARD.textlessBlack) {
+    verticalOffset = 195;
+    const selectedTypes = Object.entries(blackTextlessTypes).filter(
+      ([_, value]) => value === true,
+    );
+    const selectedTypesCount = Object.keys(selectedTypes).length;
+    horizontalOffset = selectedTypesCount * TEXTLESS_BLACK_SPACING;
+  }
+  return { horizontalOffset, verticalOffset };
+}
+
+export const Card = ({ form, isPreview, cardType }: CardProps) => {
+  const TEXTLESS_OFFSET = getTextlessOffset(cardType, form.blackTextlessTypes);
+
+  function handleTemplate(
+    masterNameFieldSize: NAME_FIELD_SIZES,
+  ): StaticImageData {
+    if (cardType == MAIN_CARD.textless) {
+      switch (masterNameFieldSize) {
+        case NAME_FIELD_SIZES.short:
+          return shortNameTextlessTemplate;
+        case NAME_FIELD_SIZES.medium:
+          return mediumNameTextlessTemplate;
+        case NAME_FIELD_SIZES.long:
+          return longNameTextlessTemplate;
+      }
+    } else if (cardType == MAIN_CARD.textlessBlack) {
+      switch (masterNameFieldSize) {
+        case NAME_FIELD_SIZES.short:
+          return shortNameTextlessBlackTemplate;
+        case NAME_FIELD_SIZES.medium:
+          return mediumNameTextlessBlackTemplate;
+        case NAME_FIELD_SIZES.long:
+          return longNameTextlessBlackTemplate;
+      }
+    } else {
+      switch (masterNameFieldSize) {
+        case NAME_FIELD_SIZES.short:
+          return shortNameMasterTemplate;
+        case NAME_FIELD_SIZES.medium:
+          return mediumNameMasterTemplate;
+        case NAME_FIELD_SIZES.long:
+          return longNameMasterTemplate;
+      }
+    }
+  }
+
+  return (
+    <div
+      style={isPreview ? { zoom: 0.5 } : {}}
+      className={`
+        ${!isPreview ? "absolute left-[-9999px] top-[-9999px]" : "flex flex-col items-center"}
+      `}
+    >
+      <div className={isPreview ? "xl:fixed" : ""}>
+        <div
+          id={
+            isPreview ? "card-preview" : IMAGE_CROP_SETTINGS.CARD + "-to-save"
+          }
+          className={`relative overflow-hidden ${form.grayscaleFilter ? "grayscale" : ""}`}
+          style={{
+            width: 750,
+            height: 1050,
+          }}
+        >
+          {/* Character image */}
+          {form.pic && (
+            <img
+              src={form.pic}
+              alt=""
+              className="absolute object-cover bg-black"
+              style={{
+                ...IMAGE_CROP_VALUES[
+                  cardType == MAIN_CARD.textless || cardType == MAIN_CARD.textlessBlack
+                    ? IMAGE_CROP_SETTINGS.TEXTLESS
+                    : IMAGE_CROP_SETTINGS.CARD
+                ].position,
+                ...IMAGE_CROP_VALUES[
+                  cardType == MAIN_CARD.textless || cardType == MAIN_CARD.textlessBlack
+                    ? IMAGE_CROP_SETTINGS.TEXTLESS
+                    : IMAGE_CROP_SETTINGS.CARD
+                ].dimensions,
+              }}
+            />
+          )}
+
+          {/* Template frame */}
+          <img
+            src={handleTemplate(form.masterNameFieldSize).src}
+            alt=""
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              width: 750,
+              height: 1050,
+              filter: `hue-rotate(${form.cardColorSettings?.hue ?? 0}deg) 
+              brightness(${form.cardColorSettings?.brightness ?? 1}) 
+              saturate(${form.cardColorSettings?.saturation ?? 1})`,
+            }}
+          />
+
+          {/* Black Textless Types (next to name) */}
+          {form.blackTextlessTypes && form.cardToMake == MAIN_CARD.textlessBlack && <div className="absolute" style={{ top: 775 + TEXTLESS_OFFSET.verticalOffset, left: 25 }}>
+              <div className="flex flex-row">
+                <div className="flex flex-row justify-center items-center align-center" style={{height: "64px"}}>
+                {ATTACK_TYPES.map(
+                  (attackType) =>
+                    form.blackTextlessTypes[attackType.toLowerCase().replaceAll(' ', '')] && (
+                        <img
+                          src={`attack-types-text/${attackType.toLowerCase().replaceAll(' ', '')}.png`}
+                          alt={attackType}
+                          style={{width: TEXTLESS_BLACK_SPACING + "px"}}
+                          key={attackType.toLowerCase().replaceAll(' ', '')}
+                        />
+                    ),
+                )}
+                </div>
+            </div>
+          </div>
+          }
+
+          {/* Name */}
+          <div
+            className="absolute flex items-center"
+            style={{
+              left: 30 + TEXTLESS_OFFSET.horizontalOffset,
+              top: 778 + TEXTLESS_OFFSET.verticalOffset,
+              fontSize: form.masterNameFontSize,
+              fontFamily: '"Times New Roman"',
+              height: "60px",
+              width: "700px",
+              color: form.masterNameColor,
+            }}
+          >
+            {form.masterName}
+          </div>
+
+          {/* Objective Value */}
+          {form.objectiveValue !== null && (
+            <div className="absolute right-[10px] top-0 w-[190px]">
+              <img
+                src={"./objective-vp/" + form.objectiveValue + " VP.png"}
+                alt=""
+              />
+            </div>
+          )}
+
+          {/* Event Mana */}
+          {form.eventMana !== null && (
+            <div
+              className="absolute top-[13px] w-[190px]"
+              style={{
+                right: form.objectiveValue == null ? 5 : 200,
+              }}
+            >
+              <img
+                src={"./event-mana/" + form.eventMana + " Mana.png"}
+                alt=""
+              />
+            </div>
+          )}
+
+          {/* Mana & Attack */}
+          {/* Attack */}
+          {form.cardAttack != null && (
+            <div
+              className="absolute"
+              style={{
+                right: 10,
+                top: 770 + TEXTLESS_OFFSET.verticalOffset,
+              }}
+            >
+              <div className="relative">
+                <img
+                  src={
+                    form.cardToMake == MAIN_CARD.textlessBlack
+                      ? "./attack-card/attack_black.png"
+                      : "./attack-card/attack.png"
+                  }
+                  alt=""
+                />
+                <div
+                  className="absolute"
+                  style={{
+                    left: "35%",
+                    fontSize: "74px",
+                    fontFamily: '"Times New Roman"',
+                    top: "50%",
+                    transform: "translate(-65%, -50%)",
+                    letterSpacing: form.cardAttack.toString().includes("1")
+                      ? "-5px"
+                      : "-2px",
+                  }}
+                >
+                  {form.cardAttack}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mana */}
+          {form.cardMana != null && (
+            <div
+              className="absolute"
+              style={{
+                right: 169,
+                top: 770 + TEXTLESS_OFFSET.verticalOffset,
+              }}
+            >
+              <div className="relative">
+                <img
+                  src={
+                    form.cardToMake == MAIN_CARD.textlessBlack
+                      ? "./attack-card/mana_black.png"
+                      : "./attack-card/mana.png"
+                  }
+                  alt=""
+                />
+                <div
+                  className="absolute"
+                  style={{
+                    left: "33%",
+                    fontSize: "74px",
+                    fontFamily: '"Times New Roman"',
+                    top: "50%",
+                    transform: "translate(-67%, -50%)",
+                    color:
+                      form.cardToMake == MAIN_CARD.textlessBlack
+                        ? "#ffffff"
+                        : "#15e86f",
+                    letterSpacing: form.cardMana.toString().includes("1")
+                      ? "-5px"
+                      : "-2px",
+                  }}
+                >
+                  {form.cardMana}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Attack Type */}
+          <div className="absolute" style={{ top: 10, left: 10 }}>
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-col gap-[2px]">
+                {ATTACK_TYPES.map(
+                  (attackType) =>
+                    form.attackTypes[attackType.toLowerCase().replaceAll(' ', '')] && (
+                      <div key={attackType.toLowerCase().replaceAll(' ', '')}>
+                        <img
+                          src={`attack-types-card/${attackType.toLowerCase().replaceAll(' ', '')}.png`}
+                          alt={attackType}
+                        />
+                      </div>
+                    ),
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* General Ability */}
+          {cardType == MAIN_CARD.general && form.masterAbility && (
+            <AbilityText
+              text={form.masterAbility}
+              revealServantName={form.revealServantName}
+              timesPerGame={form.timesPerGame}
+            />
+          )}
+
+          {/* Servant Class */}
+          {cardType == MAIN_CARD.servant && form.servantClass !== null && (
+            <div className="absolute right-[20px] top-[20px]">
+              <img
+                src={"./servant-classes/" + form.servantClass + ".png"}
+                className="block"
+                alt=""
+              />
+            </div>
+          )}
+
+          {/* Servant Info */}
+          {cardType == MAIN_CARD.servant && form.servantCards && (
+            <div
+              className="absolute text-4xl"
+              style={{
+                top: 860,
+                left: 33,
+                width: "684px",
+                fontFamily: '"Times New Roman"',
+              }}
+            >
+              <div
+                className={`flex w-full justify-between ${form.servantCards.length <= 6 ? "mx-4" : "mx-1"}`}
+                style={{ maxHeight: "170px" }}
+              >
+                {/* Strength/Agility/Magic basic attacks */}
+                <div className="flex flex-col gap-2 flex-shrink-0">
+                  {form.servantCards
+                    .slice(0, 3)
+                    .filter((card) => card.showIcon == true)
+                    .map((cardItem, i) => (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-2 ${cardItem.cardType.toLowerCase().replaceAll(' ', '')} h-10`}
+                      >
+                        <img
+                          style={{ width: "35px", height: "28px" }}
+                          src={getCardIcon(cardItem.cardType)}
+                          alt=""
+                        />
+                        <span>{cardItem.values}</span>
+                      </div>
+                    ))}
+                </div>
+                {/* Special basics/other attacks */}
+                <div
+                  className={`flex gap-2 w-full justify-center ${form.servantCards.slice(3).length > 6 ? "-mt-4" : ""} ${form.servantCards.slice(3).length > 3 ? "text-3xl" : "text-4xl"}`}
+                  style={{ fontSize: form.servantCardsSpecialFontSize + "px" }}
+                >
+                  {getServantChunked(form.servantCards.slice(3)).map(
+                    (group, colIndex) => (
+                      <div
+                        key={colIndex}
+                        className={`grid grid-flow-col gap-1`}
+                        style={{
+                          gridTemplateRows: `repeat(${form.servantCards ? getServantSplitCount(form.servantCards.slice(3)) : "3"}, minmax(0, 1fr))`,
+                        }}
+                      >
+                        {group.map((cardItem, i) => (
+                          <div
+                            key={i}
+                            className={`flex flex-row gap-2 items-center ${cardItem.cardType.toLowerCase().replaceAll(' ', '')}`}
+                          >
+                            <img
+                              className={`block attack-type-icon ${cardItem.cardType == "noblephantasm" && "noblephantasm"}`}
+                              src={getCardIcon(cardItem.cardType)}
+                              alt=""
+                            />
+                            {cardItem.values}
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-center">
+          <div className="text-2xl italic mt-2">
+            Card is previewed at 50% zoom.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};

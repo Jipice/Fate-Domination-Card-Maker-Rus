@@ -1,0 +1,37 @@
+input[type="text"],
+select {
+  width: 229px;
+  height: 36px;
+  padding: 0.25rem;
+  color: white;
+  background: #192145;
+  border: 1px solid lightblue;
+  border-radius: 8px;
+}
+
+select {
+  cursor: pointer;
+}
+
+.category-header {
+  text-transform: uppercase;
+  text-decoration: underline;
+}
+
+h2.field-header,
+label.field-header {
+  font-weight: 600;
+}
+
+.input-block {
+  margin-bottom: 1rem;
+}
+
+.attack-type-icon {
+  width: 35px;
+  height: 28px;
+
+  &.noblephantasm {
+    height: 35px;
+  }
+}

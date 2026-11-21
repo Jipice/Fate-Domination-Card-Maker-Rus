@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+:root {
+  --background: #1E2939;
+  --foreground: #ffffff;
+  --primary-dark-blue: #192145;
+  /* --primary-light-blue: #68afd8; */
+  --primary-light-blue: #434e81;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-primary-dark-blue: var(--primary-dark-blue);
+  --color-primary-light-blue: var(--primary-light-blue);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Geist", sans-serif;
+}
+
+input[type="text"],
+select {
+  width: 229px;
+  height: 36px;
+  padding: 0.25rem;
+  background: var(--primary-dark-blue);
+  border: 1px solid var(--primary-light-blue);
+  border-radius: 8px;
+}
+
+select {
+  cursor: pointer;
+}
+
+.tooltip {
+  font-style: italic;
+  color: rgb(156, 163, 175);
+}
+
+.category-header {
+  text-transform: uppercase;
+  text-decoration: underline;
+}
+
+h2.field-header,
+label.field-header {
+  font-weight: 600;
+}
+
+.input-block {
+  margin-bottom: 1rem;
+}
+
+.cropper-button {
+  width: 7rem;
+  height: 2.5rem;
+  color: white;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.cropper-button-upload {
+  width: 9rem;
+}
+
+.strength {
+  color: #ff1f1f;
+}
+
+.agility {
+  color: #00c100;
+}
+
+.magic {
+  color: #0061ff;
+}
+
+.noblephantasm {
+  color: #fff280;
+}
+
+.reveal-servant-name-color {
+  color: #ebcb3d;
+}
+
+input[type='number'] {
+    -moz-appearance:textfield;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+}
+
+.import-export-button {
+  width: 8rem;
+  height: 2.5rem;
+  color: white;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+  justify-content: center;
+}
