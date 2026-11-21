@@ -22,7 +22,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fate/Domination Card Maker",
+  title: "Создатель карт Fate/Domination",
   description: "Создавайте собственные карты для Fate/Domination!",
 };
 
