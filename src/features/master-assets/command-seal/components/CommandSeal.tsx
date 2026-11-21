@@ -98,7 +98,7 @@ const CommandSeal = ({ form, isPreview }: props) => {
               </span>
               <span>
                 <span className="font-semibold">Действие</span>: Переместись из
-                [Мияма] или [Синто] куда угодно, игнорируя столкновение.
+                [Миима] или [Синто] куда угодно, игнорируя столкновение.
               </span>
             </div>
           </div>

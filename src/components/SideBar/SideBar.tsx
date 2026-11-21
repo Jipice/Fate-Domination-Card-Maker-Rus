@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { IoHome, IoChevronBack, IoChevronForward, IoShapes } from "react-icons/io5";
 import { PiDiamondsFourFill } from "react-icons/pi";
 import { GiSwordInStone } from "react-icons/gi";
-import { FaInfoCircle, FaRegUserCircle, FaRegUser } from "react-icons/fa";
+import { FaInfoCircle, FaRegUserCircle, FaRegUser, FaSave } from "react-icons/fa";
 import { IoIosStar } from "react-icons/io";
 import { SideBarItem } from "./SideBarItem";
 
@@ -14,6 +14,7 @@ const menuItems = [
   { label: "Фигурка мастера", icon: FaRegUser, link: "master-standee" },
   { label: "Коробка мастера", icon: IoShapes, link: "master-box" },
   { label: "Командное Заклинание", icon: IoIosStar, link: "command-seal" },
+  { label: "Библиотека", icon: FaSave, link: "library" },
 ];
 
 const DEFAULT_WIDTH = 250;

@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveToLibraryButton, useLibraryLoader } from "@/src/features/library/library";
 import { ATTACK_TYPE_LABELS, SERVANT_CLASS_LABELS } from "@/src/constants/translations";
 import { useState } from "react";
 import { DownloadButton } from "@/src/components/buttons/DownloadButton";
@@ -39,6 +40,7 @@ const emptyState: ServantCardForm = {
 
 const ServantCard = () => {
   const [form, setForm] = useState<ServantCardForm>(defaultState);
+  const libraryId = useLibraryLoader<ServantCardForm>("servant-card", setForm);
   return (
     <div>
       <div className="flex flex-row items-center gap-2">
@@ -171,10 +173,10 @@ const ServantCard = () => {
             </select>
           </div>
           <span className="flex">
-          <DownloadButton
-            idToSave={IMAGE_CROP_SETTINGS.SERVANT_SUMMON}
-            name={form.name}
-          />
+          <SaveToLibraryButton
+  captureId={IMAGE_CROP_SETTINGS.SERVANT_SUMMON + "-to-save"}
+  page="servant-card" name={form.name} getForm={() => form} libraryId={libraryId} />
+          <DownloadButton idToSave={IMAGE_CROP_SETTINGS.SERVANT_SUMMON} name={form.name} />
           </span>
         </div>
         <div className="w-1/2">

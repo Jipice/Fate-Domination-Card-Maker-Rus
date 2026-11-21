@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveToLibraryButton, useLibraryLoader } from "@/src/features/library/library";
 import { COST_TYPES, CostType } from "./constants/costConsts";
 import { ATTACK_TYPE_LABELS } from "@/src/constants/translations";
 import React, { useState } from "react";
@@ -80,6 +81,7 @@ const initialState = {
 
 export const MasterCardCreation = () => {
   const [form, setForm] = useState<formInput>(initialState);
+  const libraryId = useLibraryLoader<formInput>("master-card", setForm);
 
   const handleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -118,9 +120,12 @@ export const MasterCardCreation = () => {
         <div className="xl:w-1/2 flex flex-col justify-between">
           <div className="flex flex-col md:flex-row justify-between items-center gap-2">
             <PageName />
-            <span className="flex gap-2">
+            <span className="flex flex-wrap justify-end gap-2">
               <ClearFormButton setForm={setForm} emptyState={emptyState} />
               <ExportImportFeature form={form} setForm={setForm} />
+              <SaveToLibraryButton
+  captureId={IMAGE_CROP_SETTINGS.CARD + "-to-save"}
+  page="master-card" name={form.masterName} getForm={() => form} libraryId={libraryId} variant="small" />
             </span>
           </div>
           <hr className="my-3" />
@@ -395,10 +400,10 @@ export const MasterCardCreation = () => {
           </form>
 
           <div className="flex flex-row w-full gap-2">
-            <DownloadButton
-              idToSave={IMAGE_CROP_SETTINGS.CARD}
-              name={form.masterName}
-            />
+            <SaveToLibraryButton
+  captureId={IMAGE_CROP_SETTINGS.CARD + "-to-save"}
+  page="master-card" name={form.masterName} getForm={() => form} libraryId={libraryId} />
+            <DownloadButton idToSave={IMAGE_CROP_SETTINGS.CARD} name={form.masterName} />
             <ExportImportFeature form={form} setForm={setForm} exportOnly />
           </div>
         </div>

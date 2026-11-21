@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveToLibraryButton, useLibraryLoader } from "@/src/features/library/library";
 import { useState } from "react";
 import { DownloadButton } from "@/src/components/buttons/DownloadButton";
 import shirouBox from "./images/shirou-box.png";
@@ -18,6 +19,7 @@ const emptyState: BoxPicAndColorForm = {
 
 const MasterBoxCreation = () => {
   const [form, setForm] = useState<BoxPicAndColorForm>(emptyState);
+  const libraryId = useLibraryLoader<BoxPicAndColorForm>("master-box", setForm);
   return (
     <div>
       <SimpleMasterForm
@@ -37,10 +39,15 @@ const MasterBoxCreation = () => {
       />
       <MasterBox form={form} isPreview={false} />
       <MasterBoxPreview form={form} />
-      <DownloadButton
-        idToSave={IMAGE_CROP_SETTINGS.MASTER_BOX}
-        name={IMAGE_CROP_SETTINGS.MASTER_BOX}
-      />
+      <div className="flex flex-row w-full gap-2">
+        <SaveToLibraryButton
+  captureId={IMAGE_CROP_SETTINGS.MASTER_BOX + "-to-save"}
+  page="master-box" name="Коробка мастера" getForm={() => form} libraryId={libraryId} />
+        <DownloadButton
+          idToSave={IMAGE_CROP_SETTINGS.MASTER_BOX}
+          name={IMAGE_CROP_SETTINGS.MASTER_BOX}
+        />
+      </div>
     </div>
   );
 };

@@ -96,8 +96,9 @@ input::-webkit-inner-spin-button {
 }
 
 .import-export-button {
-  width: 8rem;
+  width: 10rem;
   height: 2.5rem;
+  justify-content: center;
   color: white;
   border-radius: 0.25rem;
   cursor: pointer;

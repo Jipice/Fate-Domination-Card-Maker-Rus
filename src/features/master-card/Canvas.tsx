@@ -236,6 +236,8 @@ export const Card = ({ form, isPreview, cardType }: CardProps) => {
             style={{
               width: 750,
               height: 1050,
+              // servant cards: drop the template's black margin (black is transparent in "screen")
+              mixBlendMode: cardType == MAIN_CARD.servant ? "screen" : undefined,
               filter: `hue-rotate(${form.cardColorSettings?.hue ?? 0}deg) 
               brightness(${form.cardColorSettings?.brightness ?? 1}) 
               saturate(${form.cardColorSettings?.saturation ?? 1})`,

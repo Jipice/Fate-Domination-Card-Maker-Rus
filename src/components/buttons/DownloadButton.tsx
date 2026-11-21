@@ -1,3 +1,4 @@
+import { FaDownload } from "react-icons/fa";
 import { IMAGE_CROP_SETTINGS } from "@/src/constants/cropConstants";
 import { snapdom } from "@zumer/snapdom";
 import React, { useState } from "react";
@@ -28,9 +29,10 @@ export const DownloadButton = ({ idToSave, name }: downloadProps) => {
   return (
     <button
       onClick={() => downloadPic()}
-      className={`px-10 py-2 flex-1 text-white rounded cursor-pointer ${downloading ? "bg-gray-500" : "bg-blue-500 hover:bg-blue-400"}`}
+      className={`import-export-button ${downloading ? "bg-gray-500" : "bg-blue-500 hover:bg-blue-400"}`}
       disabled={downloading}
     >
+      <FaDownload />
       {downloading ? "Загрузка..." : "Скачать"}
     </button>
   );

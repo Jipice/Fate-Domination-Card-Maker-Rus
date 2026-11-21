@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveToLibraryButton, useLibraryLoader } from "@/src/features/library/library";
 import { useState } from "react";
 import { DownloadButton } from "@/src/components/buttons/DownloadButton";
 import shirouStandee from "./images/shirou-standee.png";
@@ -20,6 +21,7 @@ const assetType = IMAGE_CROP_SETTINGS.STANDEE;
 
 const MasterStandeeCreation = () => {
   const [form, setForm] = useState<MasterPicAndColorForm>(emptyState);
+  const libraryId = useLibraryLoader<MasterPicAndColorForm>("master-standee", setForm);
   return (
     <div>
       <SimpleMasterForm
@@ -30,7 +32,12 @@ const MasterStandeeCreation = () => {
       <ColorInputWithGradient form={form} setForm={setForm} />
       <MasterAsset form={form} isPreview={true} assetType={assetType} />
       <MasterAsset form={form} isPreview={false} assetType={assetType} />
-      <DownloadButton idToSave={assetType} name={"master-standee"} />
+      <div className="flex flex-row w-full gap-2">
+        <SaveToLibraryButton
+  captureId={assetType + "-to-save"}
+  page="master-standee" name="Фигурка мастера" getForm={() => form} libraryId={libraryId} />
+        <DownloadButton idToSave={assetType} name={"master-standee"} />
+      </div>
     </div>
   );
 };

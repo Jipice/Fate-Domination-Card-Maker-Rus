@@ -1,5 +1,6 @@
 "use client";
 
+import { SaveToLibraryButton, useLibraryLoader } from "@/src/features/library/library";
 import { useState } from "react";
 import { DownloadButton } from "@/src/components/buttons/DownloadButton";
 import defaultCommandSeal from "./images/default-command-seal.png";
@@ -17,6 +18,7 @@ const emptyState: { pic: string; name: string, nameFieldSize: NAME_FIELD_SIZES }
 
 const CommandSealCreation = () => {
   const [form, setForm] = useState<{ pic: string; name: string, nameFieldSize: NAME_FIELD_SIZES }>(emptyState);
+  const libraryId = useLibraryLoader<typeof emptyState>("command-seal", setForm);
   return (
     <div>
       <SimpleMasterForm
@@ -30,7 +32,12 @@ const CommandSealCreation = () => {
       <CommandSeal form={form} isPreview={true} />
       <CommandSeal form={form} isPreview={false} />
       
-      <DownloadButton idToSave={IMAGE_CROP_SETTINGS.COMMAND_SEAL} name={IMAGE_CROP_SETTINGS.COMMAND_SEAL} />
+      <div className="flex flex-row w-full gap-2">
+        <SaveToLibraryButton
+  captureId={IMAGE_CROP_SETTINGS.COMMAND_SEAL + "-to-save"}
+  page="command-seal" name={form.name} getForm={() => form} libraryId={libraryId} />
+        <DownloadButton idToSave={IMAGE_CROP_SETTINGS.COMMAND_SEAL} name={IMAGE_CROP_SETTINGS.COMMAND_SEAL} />
+      </div>
     </div>
   );
 };
