@@ -25,7 +25,7 @@ const ResetColorsButton = ({
           onClick={() => confirmResetPresetColors()}
           disabled={hasNoNewColors}
         >
-          Reset Colors
+          Сбросить цвета
         </button>
       )}
       {confirmResetColors && (
@@ -40,14 +40,14 @@ const ResetColorsButton = ({
               onClick={() => confirmResetPresetColors()}
               disabled={hasNoNewColors}
             >
-              Reset!
+              Да, сбросить!
             </button>
             <button
               className={`p-1 bg-blue-400 rounded flex flex-grow justify-center ${hasNoNewColors ? "opacity-50" : "cursor-pointer"}`}
               onClick={() => setConfirmResetColors(false)}
               disabled={hasNoNewColors}
             >
-              Cancel
+              Отмена
             </button>
           </div>
         </div>

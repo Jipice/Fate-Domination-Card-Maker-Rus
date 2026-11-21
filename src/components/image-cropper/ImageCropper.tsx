@@ -177,13 +177,13 @@ const ImageCropper = ({
                 onClick={() => cancelCropper()}
                 className="cropper-button bg-gray-500"
               >
-                Cancel
+                Отмена
               </button>{" "}
               <button
                 onClick={showCroppedImage}
                 className="cropper-button bg-blue-500 hover:bg-blue-400"
               >
-                Confirm
+                Подтвердить
               </button>{" "}
             </div>
           </div>

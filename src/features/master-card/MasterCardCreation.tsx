@@ -1,5 +1,6 @@
 "use client";
 
+import { ATTACK_TYPE_LABELS } from "@/src/constants/translations";
 import React, { useState } from "react";
 import { Card } from "./Canvas";
 import { ExportImportFeature } from "./components/buttons/ExportImportButtons";
@@ -128,7 +129,7 @@ export const MasterCardCreation = () => {
               <div className="input-block flex gap-2 flex-col">
                 <span>
                   <label htmlFor="masterName" className="field-header">
-                    Card Name
+                    Название карты
                   </label>
                   <div className="flex flex-row align-center gap-3">
                     <input
@@ -204,7 +205,7 @@ export const MasterCardCreation = () => {
 
               <div className="flex flex-col input-block">
                 <label htmlFor="optionDropdown" className="field-header">
-                  Card Type [General - Servant - Textless]
+                  Тип карты [Общая - Слуга - Без текста]
                 </label>
                 <select
                   id="optionDropdown"
@@ -218,7 +219,7 @@ export const MasterCardCreation = () => {
                   }}
                 >
                   <option value={MAIN_CARD.general}>
-                    General (attacks, masters...)
+                    Общая (атаки, мастера...)
                   </option>
                   <option value={MAIN_CARD.servant}>Карта слуги</option>
                   <option value={MAIN_CARD.textless}>Карта без текста</option>
@@ -240,7 +241,7 @@ export const MasterCardCreation = () => {
                 {/* Mana */}
                 <div className="flex flex-col items-start input-block">
                   <label htmlFor="manaInput" className="field-header">
-                    Mana
+                    Мана
                   </label>
                   <input
                     id="manaInput"
@@ -260,7 +261,7 @@ export const MasterCardCreation = () => {
                 {/* Attack */}
                 <div className="flex flex-col items-start input-block">
                   <label htmlFor="attackInput" className="field-header">
-                    Attack
+                    Атака
                   </label>
                   <input
                     id="attackInput"
@@ -290,7 +291,7 @@ export const MasterCardCreation = () => {
                           handleAttackTypeChange(type.toLowerCase().replaceAll(' ', ''))
                         }
                       />
-                      {ATTACK_TYPES[i]}
+                      {ATTACK_TYPE_LABELS[type] ?? type}
                     </label>
                   ))}
                 </div>
@@ -300,7 +301,7 @@ export const MasterCardCreation = () => {
                 <span className="category-header">СОБЫТИЯ И ЦЕЛИ</span>
                 <div className="input-block flex flex-col items-start">
                   <label className="field-header" htmlFor="eventMana">
-                    Event Mana
+                    Мана события
                   </label>
                   <select
                     id="eventMana"
@@ -327,7 +328,7 @@ export const MasterCardCreation = () => {
 
                 <div className="input-block flex flex-col items-start">
                   <label className="field-header" htmlFor="objective">
-                    Objective points
+                    Очки цели
                   </label>
                   <select
                     id="objective"
@@ -356,7 +357,7 @@ export const MasterCardCreation = () => {
                   <span className="category-header">ПРОЧИЕ НАСТРОЙКИ</span>
                   <div className="input-block">
                     <label className="field-header" htmlFor="grayscaleFilter">
-                      Filters
+                      Фильтры
                     </label>
                     <div className="flex gap-1">
                       <input
@@ -366,8 +367,8 @@ export const MasterCardCreation = () => {
                           mainUpdateForm("grayscaleFilter", e.target.checked)
                         }
                       />
-                      Grayscale filter
-                      <span className="tooltip">(includes card art)</span>
+                      Чёрно-белый фильтр
+                      <span className="tooltip">(включая арт карты)</span>
                     </div>
                   </div>
                   <CardColorInput form={form} setForm={setForm} />

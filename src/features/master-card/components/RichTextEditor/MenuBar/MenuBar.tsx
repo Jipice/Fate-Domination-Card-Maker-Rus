@@ -1,3 +1,4 @@
+import { ATTACK_TYPE_LABELS } from "@/src/constants/translations";
 import type { Editor } from "@tiptap/core";
 import { useEditorState } from "@tiptap/react";
 import React, { useState } from "react";
@@ -197,12 +198,12 @@ export const MenuBarContent = ({
                 type="button"
                 onClick={() => addEmoji(editor, name)}
                 className="menu-bar-button"
-                title={capitalizeString(name)}
+                title={ATTACK_TYPE_LABELS[name] ?? capitalizeString(name)}
                 style={{ marginLeft: idx === 0 ? 0 : -1 }}
               >
                 <img
                   src={image.src}
-                  alt={capitalizeString(name)}
+                  alt={ATTACK_TYPE_LABELS[name] ?? capitalizeString(name)}
                   className="w-8 h-8 object-contain"
                 />
               </button>

@@ -196,7 +196,7 @@ const ColorInput = ({
                     className="p-1 bg-blue-500 rounded cursor-pointer hover:bg-blue-400"
                     onClick={() => handleClose()}
                   >
-                    Confirm
+                    Подтвердить
                   </button>
                   <ResetColorsButton hasNoNewColors={isCurrentColorListSameAsBase} resetColors={resetPresetColors}/>
                 </div>

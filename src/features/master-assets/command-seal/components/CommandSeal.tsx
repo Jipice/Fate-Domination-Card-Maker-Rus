@@ -104,7 +104,7 @@ const CommandSeal = ({ form, isPreview }: props) => {
             <div className="text-2xl italic mt-2 flex flex-col items-center">
               <span>Печать приказа отображается в масштабе 50%.</span>
               <span>
-                For more customization, please make your own in the main page.
+                Для большей настройки создайте свою печать на главной странице.
               </span>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { COLOR_LABELS } from "@/src/constants/translations";
 import React from "react";
 import { formInput } from "../../types/formTypes";
 import { CARD_COLORS } from "../../constants/formConsts";
@@ -53,7 +54,7 @@ const CardColorInput = ({ form, setForm }: Props) => {
   return (
     <div className="flex flex-col">
       <label className="field-header" htmlFor="cardColorSettings">
-        Card Color
+        Цвет карты
       </label>
 
       <select
@@ -64,25 +65,25 @@ const CardColorInput = ({ form, setForm }: Props) => {
       >
         <option value="default">По умолчанию</option>
         <option value="" disabled>
-          &#10022; BASE
+          &#10022; БАЗОВЫЕ
         </option>
         {CARD_COLORS &&
           Object.keys(CARD_COLORS)
             .filter((key) => CARD_COLORS[key].colorType === "base")
             .map((colorKey) => (
               <option key={colorKey} value={colorKey}>
-                {colorKey.charAt(0).toUpperCase() + colorKey.slice(1)}
+                {COLOR_LABELS[colorKey] ?? colorKey}
               </option>
             ))}
         <option value="" disabled>
-          &#10022; CUSTOM
+          &#10022; ПОЛЬЗОВАТЕЛЬСКИЕ
         </option>
         {CARD_COLORS &&
           Object.keys(CARD_COLORS)
             .filter((key) => CARD_COLORS[key].colorType === "custom")
             .map((colorKey) => (
               <option key={colorKey} value={colorKey}>
-                {colorKey.charAt(0).toUpperCase() + colorKey.slice(1)}
+                {COLOR_LABELS[colorKey] ?? colorKey}
               </option>
             ))}
         <option value="custom">Пользовательский</option>

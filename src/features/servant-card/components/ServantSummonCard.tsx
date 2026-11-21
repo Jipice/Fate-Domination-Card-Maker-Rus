@@ -127,7 +127,7 @@ export const ServantSummon = ({ form, isPreview }: ServantSummonProps) => {
         </div>
         <div className="flex justify-center">
           <div className="text-2xl italic mt-2">
-            Card is previewed at 50% zoom.
+            Карта показана в масштабе 50%.
           </div>
         </div>
       </div>

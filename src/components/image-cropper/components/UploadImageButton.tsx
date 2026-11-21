@@ -69,7 +69,7 @@ const UploadImageButton = ({ setUploadedImage, dimensions }: { setUploadedImage:
           <RiImageAddLine className="text-3xl" />
           <span>Перетащите изображение сюда или нажмите, чтобы выбрать файл</span>
           <span className="text-sm italic text-gray-500">
-            (Crops to {dimensions.width} x {dimensions.height})
+            (Обрезка до {dimensions.width} x {dimensions.height})
           </span>
           {isDragReject && (
             <p className="underline">Пожалуйста, загрузите одно изображение.</p>

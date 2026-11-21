@@ -112,13 +112,13 @@ export const ExportImportFeature = ({
         className="import-export-button bg-blue-500 hover:bg-blue-400"
       >
         <FaFileDownload />
-        Save card
+        Сохранить
       </button>
       {!exportOnly && (
         <button onClick={() => fileInputRef.current?.click()}>
           <span className="import-export-button bg-blue-500 hover:bg-blue-400">
             <FaFileUpload />
-            Load card
+            Загрузить
           </span>
         </button>
       )}

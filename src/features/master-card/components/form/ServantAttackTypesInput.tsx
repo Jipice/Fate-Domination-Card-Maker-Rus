@@ -1,3 +1,4 @@
+import { SERVANT_CLASS_LABELS } from "@/src/constants/translations";
 import React from "react";
 import { formInput } from "@/src/features/master-card/types/formTypes";
 import { updateForm } from "@/src/utils/formUtils";
@@ -121,7 +122,7 @@ export const ServantAttackTypesInput = (prop: Props) => {
     <div>
       <div className="input-block flex flex-col">
         <label className="field-header" htmlFor="servantClass">
-          Servant Class
+          Класс слуги
         </label>
         <select
           id="servantClass"
@@ -137,11 +138,11 @@ export const ServantAttackTypesInput = (prop: Props) => {
         >
           <option value="">Нет</option>
           <option value="" disabled>
-            &#10022; STANDARD
+            &#10022; ОСНОВНЫЕ
           </option>
           {SERVANT_TYPES.STANDARD.map((servantType, i) => (
             <option key={i} value={servantType}>
-              {servantType}
+              {SERVANT_CLASS_LABELS[servantType] ?? servantType}
             </option>
           ))}
           <option value="" disabled>
@@ -149,7 +150,7 @@ export const ServantAttackTypesInput = (prop: Props) => {
           </option>
           {SERVANT_TYPES.EXTRA.map((servantType, i) => (
             <option key={i} value={servantType}>
-              {servantType}
+              {SERVANT_CLASS_LABELS[servantType] ?? servantType}
             </option>
           ))}
         </select>
@@ -205,7 +206,7 @@ export const ServantAttackTypesInput = (prop: Props) => {
               )
             }
           >
-            Add Special & Other Types
+            Добавить особый и другие типы
           </button>
 
           {prop.form.servantCards && prop.form.servantCards.length >= 4 && (
@@ -278,7 +279,7 @@ export const ServantAttackTypesInput = (prop: Props) => {
                   className="bg-gray-700 rounded p-1 cursor-pointer"
                   onClick={() => deleteServantAttack(card.index)}
                 >
-                  DELETE
+                  УДАЛИТЬ
                 </button>
 
                 <label htmlFor="eventMana">Тип:</label>

@@ -5,7 +5,7 @@ const RecropImagebutton = ({ croppedImage, recropImage }: { croppedImage: string
   return (
     <div>
       <button className="recrop-button bg-blue-500 hover:bg-blue-400" onClick={recropImage}>
-        Recrop Image
+        Обрезать заново
       <img
         src={croppedImage}
         alt="Обрезанное изображение"

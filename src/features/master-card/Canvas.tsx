@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTimesPerGame } from "@/src/constants/translations";
 import { servantCardType } from "@/src/types/servantTypes";
 import shortNameMasterTemplate from "./images/master-template-short.png";
 import mediumNameMasterTemplate from "./images/master-template-medium.png";
@@ -72,17 +73,17 @@ function AbilityText({
   if (timesPerGame) {
     switch (timesPerGame) {
       case 1:
-        timesPerGameText = "<Once per Game>";
+        timesPerGameText = formatTimesPerGame(1);
         break;
       case 2:
-        timesPerGameText = "<Twice per Game>";
+        timesPerGameText = formatTimesPerGame(2);
         break;
       case 3:
-        timesPerGameText = "<Thrice per Game>";
+        timesPerGameText = formatTimesPerGame(3);
         break;
       default:
         if (timesPerGame) {
-          timesPerGameText = `<${timesPerGame} Times per Game>`;
+          timesPerGameText = formatTimesPerGame(timesPerGame);
         }
     }
   }
@@ -103,7 +104,7 @@ function AbilityText({
         >
           {revealServantName && (
             <span className="reveal-servant-name-color">
-              [Reveal Servant Name]
+              [Раскрыть имя слуги]
             </span>
           )}
           {timesPerGame && (
@@ -490,7 +491,7 @@ export const Card = ({ form, isPreview, cardType }: CardProps) => {
         </div>
         <div className="flex justify-center">
           <div className="text-2xl italic mt-2">
-            Card is previewed at 50% zoom.
+            Карта показана в масштабе 50%.
           </div>
         </div>
       </div>

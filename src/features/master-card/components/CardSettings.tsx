@@ -1,3 +1,4 @@
+import { CARD_TYPE_HEADERS } from "@/src/constants/translations";
 import React from "react";
 import { formInput, MAIN_CARD, mainCardType } from "../types/formTypes";
 import RichTextEditor from "./RichTextEditor/RichTextEditor";
@@ -18,7 +19,7 @@ const CardSettings = ({
   return (
     <>
       <div className="input-block w-full">
-        <div className="category-header">{cardType.toUpperCase()} CARD</div>
+        <div className="category-header">{CARD_TYPE_HEADERS[cardType] ?? cardType.toUpperCase()}</div>
         {form.cardToMake === MAIN_CARD.general && (
           <>
             <h2 className="field-header">Способность карты</h2>
@@ -47,7 +48,7 @@ const CardSettings = ({
                   }
                 />
                 <span className="select-none font-semibold">
-                  Reveal Servant Name
+                  Показывать имя слуги
                 </span>
               </label>
               <label className="block field-header">Количество применений за игру</label>

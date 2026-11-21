@@ -92,7 +92,7 @@ export const MasterBox = ({ form, isPreview }: props) => {
         </div>
         <div className="flex justify-center">
           <div className="text-2xl italic mt-2">
-            Token is previewed at 50% zoom.
+            Жетон показан в масштабе 50%.
           </div>
         </div>
       </div>

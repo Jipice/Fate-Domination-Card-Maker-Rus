@@ -1,5 +1,6 @@
 "use client";
 
+import { ATTACK_TYPE_LABELS, SERVANT_CLASS_LABELS } from "@/src/constants/translations";
 import { useState } from "react";
 import { DownloadButton } from "@/src/components/buttons/DownloadButton";
 import { ServantCardForm } from "./types/formTypes";
@@ -48,7 +49,7 @@ const ServantCard = () => {
         <div className="w-1/2">
           <div className="input-block">
             <label htmlFor="masterName" className="field-header">
-              Card Name
+              Название карты
             </label>
             <div className="flex flex-row align-center gap-3">
               <input
@@ -78,7 +79,7 @@ const ServantCard = () => {
           </div>
           <div className="input-block flex flex-col">
             <label className="field-header" htmlFor="servantClass">
-              Servant Class
+              Класс слуги
             </label>
             <select
               defaultValue={form.class}
@@ -97,15 +98,15 @@ const ServantCard = () => {
               </option>
               {SERVANT_TYPES.STANDARD.map((servantType, i) => (
                 <option key={i} value={servantType}>
-                  {({Saber:"Сэйбер",Lancer:"Лансер",Archer:"Арчер",Rider:"Райдер",Caster:"Кастер",Assassin:"Ассасин",Berserker:"Берсерк", "Alter Ego":"Альтер-эго",Avenger:"Мститель",Beast:"Зверь", "Beast (Black)":"Зверь (чёрный)",Foreigner:"Форейнер", "Moon Cancer":"Лунный рак",Pretender:"Претендент",Ruler:"Правитель",Shielder:"Защитник"} as Record<string,string>)[servantType]}
+                  {SERVANT_CLASS_LABELS[servantType] ?? servantType}
                 </option>
               ))}
               <option value="" disabled>
-                &#10022; EXTRA
+                &#10022; ДОПОЛНИТЕЛЬНЫЕ
               </option>
               {SERVANT_TYPES.EXTRA.map((servantType, i) => (
                 <option key={i} value={servantType}>
-                  {({Saber:"Сэйбер",Lancer:"Лансер",Archer:"Арчер",Rider:"Райдер",Caster:"Кастер",Assassin:"Ассасин",Berserker:"Берсерк", "Alter Ego":"Альтер-эго",Avenger:"Мститель",Beast:"Зверь", "Beast (Black)":"Зверь (чёрный)",Foreigner:"Форейнер", "Moon Cancer":"Лунный рак",Pretender:"Претендент",Ruler:"Правитель",Shielder:"Защитник"} as Record<string,string>)[servantType]}
+                  {SERVANT_CLASS_LABELS[servantType] ?? servantType}
                 </option>
               ))}
             </select>
@@ -146,10 +147,10 @@ const ServantCard = () => {
 
           <div className="input-block flex flex-col">
             <label className="field-header" htmlFor="primaryTrait">
-              Primary Trait
+              Основная черта
             </label>
             <span className="italic text-sm">
-              (Tip: This affects the horizontal line color)
+              (Подсказка: влияет на цвет горизонтальной линии)
             </span>
             <select
               value={form.primaryTrait}
@@ -164,7 +165,7 @@ const ServantCard = () => {
             >
               {BASIC_CARDS.map((card: BasicCardTypes, i) => (
                 <option value={card} key={i}>
-                  {capitalizeString(card)}
+                  {ATTACK_TYPE_LABELS[card] ?? capitalizeString(card)}
                 </option>
               ))}
             </select>
