@@ -73,7 +73,7 @@ const initialState = {
     { index: 1, cardType: "Agility", values: "", showIcon: true },
     { index: 2, cardType: "Magic", values: "", showIcon: true },
   ],
-  masterName: "Крутое название карты",
+  masterName: "Название карты",
   masterAbility: `<p><span style="color: #ffffff; font-size: 30px; line-height: 1.1;"><em>Пример</em> — добавьте способности!</span></p>
   <p><span style="color: #ffffff; font-size: 30px; line-height: 1.1;"><em>Другой пример</em> — <strong>Пассивная способность/Действие:</strong> заплатите 1 ману, чтобы [выполнить действие].</span></p>`,
 };
