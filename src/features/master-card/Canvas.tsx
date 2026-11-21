@@ -1,5 +1,6 @@
 "use client";
 
+import { getCost } from "./constants/costConsts";
 import { formatTimesPerGame } from "@/src/constants/translations";
 import { servantCardType } from "@/src/types/servantTypes";
 import shortNameMasterTemplate from "./images/master-template-short.png";
@@ -353,8 +354,8 @@ export const Card = ({ form, isPreview, cardType }: CardProps) => {
                 <img
                   src={
                     form.cardToMake == MAIN_CARD.textlessBlack
-                      ? "./attack-card/mana_black.png"
-                      : "./attack-card/mana.png"
+                      ? getCost(form.costType).blackImage
+                      : getCost(form.costType).image
                   }
                   alt=""
                 />
@@ -369,7 +370,7 @@ export const Card = ({ form, isPreview, cardType }: CardProps) => {
                     color:
                       form.cardToMake == MAIN_CARD.textlessBlack
                         ? "#ffffff"
-                        : "#15e86f",
+                        : getCost(form.costType).color,
                     letterSpacing: form.cardMana.toString().includes("1")
                       ? "-5px"
                       : "-2px",

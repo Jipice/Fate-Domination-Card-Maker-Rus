@@ -1,5 +1,6 @@
 "use client";
 
+import { COST_TYPES, CostType } from "./constants/costConsts";
 import { ATTACK_TYPE_LABELS } from "@/src/constants/translations";
 import React, { useState } from "react";
 import { Card } from "./Canvas";
@@ -33,6 +34,7 @@ const emptyState: formInput = {
   eventMana: null,
   cardAttack: null,
   cardMana: null,
+  costType: "mana",
   attackTypes: {
     strength: false,
     agility: false,
@@ -240,9 +242,23 @@ export const MasterCardCreation = () => {
                 <span className="category-header">Мана и атака</span>
                 {/* Mana */}
                 <div className="flex flex-col items-start input-block">
-                  <label htmlFor="manaInput" className="field-header">
-                    Мана
+                  <label htmlFor="costType" className="field-header">
+                    Оплата
                   </label>
+                  <select
+                    id="costType"
+                    name="costType"
+                    value={form.costType ?? "mana"}
+                    onChange={(e) =>
+                      mainUpdateForm("costType", e.target.value as CostType)
+                    }
+                  >
+                    {Object.entries(COST_TYPES).map(([key, cost]) => (
+                      <option key={key} value={key}>
+                        {cost.label}
+                      </option>
+                    ))}
+                  </select>
                   <input
                     id="manaInput"
                     name="manaInput"

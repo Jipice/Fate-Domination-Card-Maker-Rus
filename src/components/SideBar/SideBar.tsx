@@ -13,7 +13,7 @@ const menuItems = [
   { label: "Жетон мастера", icon: FaRegUserCircle, link: "master-token" },
   { label: "Фигурка мастера", icon: FaRegUser, link: "master-standee" },
   { label: "Коробка мастера", icon: IoShapes, link: "master-box" },
-  { label: "Командное заклинание", icon: IoIosStar, link: "command-seal" },
+  { label: "Печать приказа", icon: IoIosStar, link: "command-seal" },
 ];
 
 const DEFAULT_WIDTH = 250;

@@ -1,3 +1,4 @@
+import type { CostType } from "../constants/costConsts";
 import { Color } from "@/src/types/colorTypes";
 import { attackTypesType, servantCardType } from "../../../types/servantTypes";
 import { NAME_FIELD_SIZES } from "@/src/constants/formConstants";
@@ -21,6 +22,7 @@ export type formInput = {
   eventMana: number | 'X' | null;
   cardAttack: string | null;
   cardMana: string | null;
+  costType: CostType;
   attackTypes: AttackTypes;
   masterAbility: string;
   grayscaleFilter: boolean;

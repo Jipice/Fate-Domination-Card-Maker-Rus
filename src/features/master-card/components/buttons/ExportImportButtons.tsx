@@ -73,6 +73,10 @@ export const ExportImportFeature = ({
       }
     }
 
+    if (!form.costType) {
+      form.costType = "mana";
+    }
+
     if (!form.masterNameFieldSize) {
       form.masterNameFieldSize = NAME_FIELD_SIZES.short;
     }
