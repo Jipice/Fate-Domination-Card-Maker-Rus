@@ -9,7 +9,7 @@ import { SideBarItem } from "./SideBarItem";
 
 const menuItems = [
   { label: "Главная", icon: PiDiamondsFourFill, link: "" },
-  { label: "Призыв мастера/слуги", icon: GiSwordInStone, link: "servant-summon" },
+  { label: "Призыв слуги", icon: GiSwordInStone, link: "servant-summon" },
   { label: "Жетон мастера", icon: FaRegUserCircle, link: "master-token" },
   { label: "Фигурка мастера", icon: FaRegUser, link: "master-standee" },
   { label: "Коробка мастера", icon: IoShapes, link: "master-box" },
