@@ -11,7 +11,7 @@ import { NAME_FIELD_SIZES } from "@/src/constants/formConstants";
 
 const emptyState: { pic: string; name: string, nameFieldSize: NAME_FIELD_SIZES } = {
   pic: defaultCommandSeal.src,
-  name: "Печать приказа",
+  name: "Командное Заклинание",
   nameFieldSize: NAME_FIELD_SIZES.short, 
 };
 
