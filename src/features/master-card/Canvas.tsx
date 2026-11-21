@@ -242,6 +242,16 @@ export const Card = ({ form, isPreview, cardType }: CardProps) => {
             }}
           />
 
+          {/* Gold frame for servant cards */}
+          {cardType == MAIN_CARD.servant && (
+            <img
+              src="./servant-frame.png"
+              alt=""
+              className="absolute inset-0 pointer-events-none"
+              style={{ width: 750, height: 1050 }}
+            />
+          )}
+
           {/* Black Textless Types (next to name) */}
           {form.blackTextlessTypes && form.cardToMake == MAIN_CARD.textlessBlack && <div className="absolute" style={{ top: 775 + TEXTLESS_OFFSET.verticalOffset, left: 25 }}>
               <div className="flex flex-row">
@@ -412,7 +422,7 @@ export const Card = ({ form, isPreview, cardType }: CardProps) => {
 
           {/* Servant Class */}
           {cardType == MAIN_CARD.servant && form.servantClass !== null && (
-            <div className="absolute right-[20px] top-[20px]">
+            <div className="absolute right-[20px] top-[120px]">
               <img
                 src={"./servant-classes/" + form.servantClass + ".png"}
                 className="block"
