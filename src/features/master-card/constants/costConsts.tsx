@@ -13,6 +13,18 @@ export const COST_TYPES = {
     blackImage: "./attack-card/command-spell.png",
     color: "#c00000",
   },
+  po: {
+    label: "ПО",
+    image: "./attack-card/po-cost.png",
+    blackImage: "./attack-card/po-cost.png",
+    color: "#e8c832",
+  },
+  advantage: {
+    label: "Преимущество",
+    image: "./attack-card/advantage-cost.png",
+    blackImage: "./attack-card/advantage-cost.png",
+    color: "#ffffff",
+  },
 } as const;
 
 export type CostType = keyof typeof COST_TYPES;

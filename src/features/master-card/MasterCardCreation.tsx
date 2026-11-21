@@ -262,6 +262,7 @@ export const MasterCardCreation = () => {
                   <input
                     id="manaInput"
                     name="manaInput"
+                    style={{ marginTop: 12 }}
                     type="text"
                     maxLength={2}
                     value={form.cardMana ?? ""}
