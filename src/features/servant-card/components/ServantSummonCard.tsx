@@ -25,7 +25,7 @@ export const ServantSummon = ({ form, isPreview }: ServantSummonProps) => {
               ? "card-preview"
               : IMAGE_CROP_SETTINGS.SERVANT_SUMMON + "-to-save"
           }
-          className={`relative overflow-hidden`}
+          className={`relative overflow-hidden ${isPreview ? "bg-black/70" : ""}`}
           style={{
             width: 750,
             height: 1050,

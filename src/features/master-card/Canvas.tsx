@@ -201,7 +201,7 @@ export const Card = ({ form, isPreview, cardType }: CardProps) => {
           id={
             isPreview ? "card-preview" : IMAGE_CROP_SETTINGS.CARD + "-to-save"
           }
-          className={`relative overflow-hidden ${form.grayscaleFilter ? "grayscale" : ""}`}
+          className={`relative overflow-hidden ${form.grayscaleFilter ? "grayscale" : ""} ${isPreview ? "bg-black/70" : ""}`}
           style={{
             width: 750,
             height: 1050,

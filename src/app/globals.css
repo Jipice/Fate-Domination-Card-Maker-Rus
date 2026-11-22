@@ -107,3 +107,38 @@ input::-webkit-inner-spin-button {
   align-items: center;
   justify-content: center;
 }
+/* ---- Тема «Фуэрина»: только оформление сайта, карточки не меняются ---- */
+[data-theme="furina"] {
+  --background: #0a1030;
+  --primary-dark-blue: rgba(12, 22, 56, 0.8);
+  --primary-light-blue: #78bef0;
+}
+
+[data-theme="furina"] body {
+  background-color: var(--background);
+  background-image: var(--theme-bg-image, none);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+}
+
+[data-theme="furina"] select,
+[data-theme="furina"] input[type="text"] {
+  background: rgba(8, 14, 40, 0.9);
+  border-color: #78bef0;
+}
+
+[data-theme="furina"] .bg-blue-500 {
+  background-color: rgba(40, 80, 190, 0.92);
+  border: 1px solid #e8c46e;
+}
+
+[data-theme="furina"] .bg-blue-500:hover {
+  background-color: rgba(70, 120, 225, 0.95);
+}
+
+[data-theme="furina"] .bg-\[\#2b3950\] {
+  background-color: rgba(12, 22, 56, 0.82);
+  backdrop-filter: blur(6px);
+  border-color: #e8c46e;
+}

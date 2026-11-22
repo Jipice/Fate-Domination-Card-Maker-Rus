@@ -43,7 +43,7 @@ const CommandSeal = ({ form, isPreview }: props) => {
                 ? "card-preview"
                 : IMAGE_CROP_SETTINGS.COMMAND_SEAL + "-to-save"
             }
-            className={`relative`}
+            className={`relative ${isPreview ? "bg-black/70" : ""}`}
             style={{
               width: 750,
               height: 1050,

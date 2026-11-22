@@ -40,7 +40,7 @@ export const MasterAsset = ({ form, isPreview, assetType }: props) => {
       <div>
         <div
           id={isPreview ? "card-preview" : assetType + "-to-save"}
-          className={`relative overflow-hidden`}
+          className={`relative overflow-hidden ${isPreview ? "bg-black/70" : ""}`}
           style={{
             width: assetSettings.width,
             height: assetSettings.height,
