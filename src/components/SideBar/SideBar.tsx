@@ -6,6 +6,8 @@ import { GiSwordInStone } from "react-icons/gi";
 import { FaInfoCircle, FaRegUserCircle, FaRegUser, FaSave } from "react-icons/fa";
 import { IoIosStar } from "react-icons/io";
 import { SideBarItem } from "./SideBarItem";
+import { Theme, THEME_KEY, applyTheme } from "./ThemeSwitch";
+import { FurinaChibi } from "./FurinaChibi";
 
 const menuItems = [
   { label: "Главная", icon: PiDiamondsFourFill, link: "" },
@@ -29,19 +31,35 @@ const clamp = (value: number) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, value))
 export const SideBar = () => {
   const [width, setWidth] = useState<number>(DEFAULT_WIDTH);
   const [collapsed, setCollapsed] = useState<boolean>(false);
+  const [theme, setTheme] = useState<Theme>("classic");
   const [showResponsiveSideBar, setShowResponsiveSideBar] =
     useState<boolean>(false);
 
-  // Restore saved size/state after mount (avoids server/client mismatch).
+  // Restore saved size, collapsed state and theme after mount (avoids server/client mismatch).
   useEffect(() => {
     try {
       const savedWidth = Number(localStorage.getItem(WIDTH_KEY));
       if (savedWidth) setWidth(clamp(savedWidth));
       setCollapsed(localStorage.getItem(COLLAPSED_KEY) === "1");
+      const savedTheme: Theme =
+        localStorage.getItem(THEME_KEY) === "furina" ? "furina" : "classic";
+      setTheme(savedTheme);
+      applyTheme(savedTheme);
     } catch {
       /* storage unavailable: keep defaults */
     }
   }, []);
+
+  const toggleTheme = () => {
+    const next: Theme = theme === "furina" ? "classic" : "furina";
+    setTheme(next);
+    applyTheme(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -123,7 +141,7 @@ export const SideBar = () => {
                 />
               ))}
             </div>
-            <div>
+            <div className="flex flex-col gap-2">
               <hr className="mt-2 mb-2" />
               <SideBarItem
                 icon={FaInfoCircle}
@@ -171,7 +189,7 @@ export const SideBar = () => {
                   />
                 ))}
               </div>
-              <div>
+              <div className="flex flex-col gap-2">
                 <hr className="mt-2 mb-2" />
                 <SideBarItem
                   icon={FaInfoCircle}
@@ -184,6 +202,8 @@ export const SideBar = () => {
           </div>
         </div>
       )}
+
+      <FurinaChibi onToggle={toggleTheme} />
 
       <div>
         <button
