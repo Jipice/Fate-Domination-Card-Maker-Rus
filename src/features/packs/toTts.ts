@@ -6,8 +6,10 @@
 export const BOX_MESH_URL =
   "https://steamusercontent-a.akamaihd.net/ugc/1023947675464791657/2B292629996860AAFC7A37A3CD9F38F9A72EBC19/";
 
-// the token is made smaller than the default size of a token in the game
-const TOKEN_SCALE = 0.4;
+// sizes taken from the packs made in the game (Adam Smasher, Kim Dokja)
+const TOKEN_SCALE = 0.4; // width and depth of the token; its height stays 1
+const TOKEN_THICKNESS = 0.295;
+const BOX_SCALE = 2.35;
 
 export type PackLike = {
   name: string;
@@ -47,10 +49,10 @@ export function toTts(pack: PackLike): Json {
     return g;
   };
 
-  const base = (name: string, nickname: string, rotZ = 0, scale = 1): Json => ({
+  const base = (name: string, nickname: string, rotZ = 0, scale = 1, scaleY = scale): Json => ({
     GUID: guid(),
     Name: name,
-    Transform: { posX: 0, posY: 1, posZ: 0, rotX: 0, rotY: 180, rotZ, scaleX: scale, scaleY: scale, scaleZ: scale },
+    Transform: { posX: 0, posY: 1, posZ: 0, rotX: 0, rotY: 180, rotZ, scaleX: scale, scaleY, scaleZ: scale },
     Nickname: nickname,
     Description: "",
     GMNotes: "",
@@ -136,13 +138,13 @@ export function toTts(pack: PackLike): Json {
 
   if (isLink(pack.token)) {
     contained.push({
-      ...base("Custom_Token", "Жетон", 0, TOKEN_SCALE),
+      ...base("Custom_Token", "Жетон", 0, TOKEN_SCALE, 1),
       CustomImage: {
         ImageURL: pack.token,
         ImageSecondaryURL: "",
         ImageScalar: 1.0,
         WidthScale: 0.0,
-        CustomToken: { Thickness: 0.2, MergeDistancePixels: 15.0, StandUp: false, Stackable: false },
+        CustomToken: { Thickness: TOKEN_THICKNESS, MergeDistancePixels: 15.0, StandUp: false, Stackable: true },
       },
     });
   }
@@ -176,7 +178,7 @@ export function toTts(pack: PackLike): Json {
 
   // a custom box (model + texture) instead of a plain bag
   const bag: Json = {
-    ...base("Custom_Model_Bag", pack.name || "Пак"),
+    ...base("Custom_Model_Bag", pack.name || "Пак", 0, BOX_SCALE),
     Description: pack.author ? `Автор: ${pack.author}` : "",
     CustomMesh: {
       MeshURL: BOX_MESH_URL,
