@@ -64,6 +64,7 @@ const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const buttonClass = "import-export-button bg-blue-500 hover:bg-blue-400 justify-center";
 const dangerClass = "import-export-button bg-gray-700 hover:bg-red-800 justify-center";
+const smallButton = "bg-blue-500 hover:bg-blue-400 rounded px-3 py-1 text-sm text-white";
 
 // a picture is either a web link or a small picture uploaded from the computer
 const isImageSrc = (value: string) => /^https?:\/\//.test(value) || /^data:image\//.test(value);
@@ -231,11 +232,13 @@ const BackSelect = ({
   onChange,
   onError,
   compact = false,
+  onFromLibrary,
 }: {
   value: string | null;
   onChange: (back: string | null) => void;
   onError: (text: string) => void;
   compact?: boolean;
+  onFromLibrary?: () => void;
 }) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [customMode, setCustomMode] = useState(() => !!value && !presetForUrl(value));
@@ -246,6 +249,11 @@ const BackSelect = ({
   const linkInvalid = linkText.trim() !== "" && !/^https?:\/\//.test(linkText.trim());
 
   const choose = (id: string) => {
+    if (id === "library") {
+      // opens the library window; the chosen card's preview becomes the back
+      onFromLibrary?.();
+      return;
+    }
     if (id === "none") {
       setCustomMode(false);
       setLinkText("");
@@ -293,7 +301,8 @@ const BackSelect = ({
         {CARD_BACK_PRESETS.map((p) => (
           <option key={p.id} value={p.id}>{p.label}</option>
         ))}
-        <option value="custom">Своя (ссылка или файл)</option>
+        {onFromLibrary && <option value="library">Из библиотеки</option>}
+        <option value="custom">Своя (ссылка/файл)</option>
       </select>
       {mode === "custom" && (
         <>
@@ -333,7 +342,13 @@ const BackSelect = ({
 };
 
 // form under every category: add a card by a link or by uploading pictures
-const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
+const AddCardForm = ({
+  onAdd,
+  onPickBackFromLibrary,
+}: {
+  onAdd: (card: NewCard) => void;
+  onPickBackFromLibrary: (pick: (url: string) => void) => void;
+}) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [face, setFace] = useState("");
   const [name, setName] = useState("");
@@ -386,15 +401,16 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-gray-400">Рубашка:</span>
-        <BackSelect value={back} onChange={setBack} onError={setError} />
-        {back && (
-          <img src={back} alt="Рубашка" className="w-8 h-12 object-contain rounded border border-black bg-black/40" />
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button className={buttonClass} onClick={add}>Добавить по ссылке</button>
-        <button className={buttonClass} onClick={() => fileRef.current?.click()}>Загрузить файлы</button>
+        <BackSelect
+          compact
+          value={back}
+          onChange={setBack}
+          onError={setError}
+          onFromLibrary={() => onPickBackFromLibrary((url) => setBack(url))}
+        />
+        {back && <img src={back} alt="Рубашка" className="w-7 h-10 object-contain rounded border border-black bg-black/40" />}
+        <button className={smallButton} onClick={add}>По ссылке</button>
+        <button className={smallButton} onClick={() => fileRef.current?.click()}>Файлами</button>
         <input
           ref={fileRef}
           type="file"
@@ -408,9 +424,8 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
             });
           }}
         />
-        <span className="text-xs text-gray-500">
-          Выбранная рубашка ставится на все карты, которые вы добавляете этими кнопками. Стандартные рубашки и ссылки
-          легче: загруженные файлы сжимаются, но всё равно увеличивают размер пака.
+        <span className="text-xs text-gray-500 basis-full">
+          Рубашка ставится на все карты, которые добавляете этими кнопками. Файлы сжимаются, но всё равно увеличивают размер пака.
         </span>
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
@@ -434,6 +449,8 @@ const PacksPage = () => {
   const [libOpen, setLibOpen] = useState(false);
   const [libCards, setLibCards] = useState<CardRecord[]>([]);
   const [libCategory, setLibCategory] = useState<string>("");
+  // when set, the library window picks a back for a card instead of adding a card
+  const [libPick, setLibPick] = useState<((url: string) => void) | null>(null);
   const [nickname, setNickname] = useState("");
   const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
   const [scale, setScale] = useState(1);
@@ -583,11 +600,23 @@ const PacksPage = () => {
   const renameCategory = (id: string, title: string) =>
     update((l) => ({ ...l, categories: l.categories.map((c) => (c.id === id ? { ...c, title } : c)) }));
 
-  const openLibrary = async () => {
+  const openLibrary = async (pick?: (url: string) => void) => {
     const list = await listCards();
     setLibCards(list.sort((a, b) => b.savedAt - a.savedAt));
     setLibCategory((prev) => prev || (loaded?.categories[0]?.id ?? ""));
+    setLibPick(pick ? () => pick : null);
     setLibOpen(true);
+  };
+
+  // a library card's preview becomes a back
+  const pickBack = (record: CardRecord) => {
+    if (!record.thumbnail) {
+      setMessage(`У карты «${record.name}» нет превью, поэтому её нельзя взять как рубашку.`);
+      return;
+    }
+    libPick?.(record.thumbnail);
+    setLibPick(null);
+    setLibOpen(false);
   };
 
   // a library card becomes a card of the pack; its small preview is used as the picture
@@ -874,7 +903,7 @@ const PacksPage = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-semibold">Карты из библиотеки</h2>
+              <h2 className="font-semibold">{libPick ? "Выберите рубашку из библиотеки" : "Карты из библиотеки"}</h2>
               <button className={dangerClass} onClick={() => setLibOpen(false)}>Закрыть</button>
             </div>
             {loaded && loaded.categories.length > 0 && (
@@ -899,7 +928,9 @@ const PacksPage = () => {
                     )}
                     <span className="truncate">{record.name}</span>
                   </div>
-                  <button className={buttonClass} onClick={() => addFromLibrary(record)}>Добавить</button>
+                  <button className={buttonClass} onClick={() => (libPick ? pickBack(record) : addFromLibrary(record))}>
+                    {libPick ? "Выбрать" : "Добавить"}
+                  </button>
                 </div>
               ))}
             </div>
@@ -1177,7 +1208,7 @@ const PacksPage = () => {
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold">Категории</h2>
               <div className="flex flex-wrap gap-2">
-                <button className={buttonClass} onClick={openLibrary}>Добавить из библиотеки</button>
+                <button className={buttonClass} onClick={() => openLibrary()}>Добавить из библиотеки</button>
                 <button className={buttonClass} onClick={addCategory}>Добавить категорию</button>
               </div>
             </div>
@@ -1213,6 +1244,7 @@ const PacksPage = () => {
                         value={card.back}
                         onChange={(back) => setCardBack(card.id, back)}
                         onError={setMessage}
+                        onFromLibrary={() => openLibrary((url) => setCardBack(card.id, url))}
                       />
                       <input
                         type="text"
@@ -1247,7 +1279,10 @@ const PacksPage = () => {
                   ))}
                 </div>
 
-                <AddCardForm onAdd={(card) => addCard(cat.id, card)} />
+                <AddCardForm
+                  onAdd={(card) => addCard(cat.id, card)}
+                  onPickBackFromLibrary={(pick) => openLibrary(pick)}
+                />
               </div>
             ))}
           </section>
