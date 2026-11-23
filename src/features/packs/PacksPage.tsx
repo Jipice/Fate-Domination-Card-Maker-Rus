@@ -888,7 +888,7 @@ const PacksPage = () => {
       {!loaded && (
         <p className="italic text-gray-400">
           Нажмите «Создать пак», чтобы собрать пак прямо на сайте, или загрузите файл Tabletop (.json) из папки{" "}
-          <b>Documents\My Games\Tabletop Simulator\Saves</b> (объекты из Saved Objects лежат в подпапке). Свои паки
+          <b>Documents\My Games\Tabletop Simulator\Saves\Saved Objects </b>. Свои паки
           можно в любой момент открыть из списка ниже и поправить.
         </p>
       )}
