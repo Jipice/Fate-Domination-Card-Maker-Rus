@@ -16,6 +16,7 @@ import {
   accountEmail,
 } from "./storage";
 import { PAGE_INFO } from "./library";
+import { getSnapshot, refreshLibrary, subscribeLibrary, LibrarySnapshot } from "./cache";
 import { supabase } from "../cloud/supabase";
 
 type SortKey = "date-desc" | "date-asc" | "name" | "type";
@@ -106,48 +107,41 @@ function parseImport(data: unknown): {
 }
 
 const LibraryPage = () => {
-  const [cards, setCards] = useState<CardRecord[]>([]);
-  const [folders, setFolders] = useState<FolderRecord[]>([]);
+  // the shared in-memory copy: shown at once, refreshed in the background
+  const [snap, setSnap] = useState<LibrarySnapshot | null>(getSnapshot());
+  const cards = snap?.cards ?? [];
+  const folders = snap?.folders ?? [];
+  const account = snap ? snap.email : undefined;
+  const loaded = snap !== null;
   // null = the library root, otherwise the id of the open folder
   const [current, setCurrent] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<"all" | PageKey>("all");
   const [sort, setSort] = useState<SortKey>("date-desc");
   // undefined = still checking the sign-in state, so we do not show "log in" by mistake
-  const [account, setAccount] = useState<string | null | undefined>(undefined);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const [loaded, setLoaded] = useState(false);
-  const requestId = useRef(0);
-
-  // Sign-in state first (it is local and fast), then cards and folders together.
-  // A newer reload makes older answers be ignored.
+  // any refresh (here, in the sidebar, or after a change) updates this page
   const reload = async () => {
-    const id = ++requestId.current;
     try {
-      const email = await accountEmail();
-      if (id !== requestId.current) return;
-      setAccount(email);
-      const [list, fl] = await Promise.all([listCards(), listFolders()]);
-      if (id !== requestId.current) return;
-      setCards(list);
-      setFolders(fl);
-      setLoaded(true);
+      await refreshLibrary();
     } catch (err) {
-      if (id !== requestId.current) return;
-      setLoaded(true);
-      setMessage(err instanceof Error ? `Не удалось загрузить библиотеку: ${err.message}` : "Не удалось загрузить библиотеку");
+      setMessage(err instanceof Error ? `Не удалось обновить библиотеку: ${err.message}` : "Не удалось обновить библиотеку");
     }
   };
 
   useEffect(() => {
+    // show what the cache has, and update it from the server quietly
+    const unsubscribe = subscribeLibrary(setSnap);
     reload();
-    // reload when the user signs in or out
     const { data } = supabase.auth.onAuthStateChange(() => {
       reload();
     });
-    return () => data.subscription.unsubscribe();
+    return () => {
+      unsubscribe();
+      data.subscription.unsubscribe();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

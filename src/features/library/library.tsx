@@ -5,6 +5,7 @@ import { snapdom } from "@zumer/snapdom";
 import { useEffect, useState } from "react";
 import type { CardRecord, PageKey } from "./db";
 import { getCard, putCard } from "./storage";
+import { refreshLibrary } from "./cache";
 
 export type { PageKey, CardRecord } from "./db";
 
@@ -114,6 +115,7 @@ export const SaveToLibraryButton = ({
       if (!record || record.thumbnail || cancelled) return;
       const thumbnail = await makeThumbnail(captureId);
       if (thumbnail && !cancelled) await putCard({ ...record, thumbnail });
+        refreshLibrary().catch(() => {});
     }, 1200); // give the editor time to draw the loaded form
     return () => {
       cancelled = true;
@@ -140,6 +142,7 @@ export const SaveToLibraryButton = ({
         thumbnail,
       };
       await putCard(record);
+      refreshLibrary().catch(() => {});
       // a new save creates a new card; only a card opened from the library is updated in place
       setStatus("saved");
     } catch (error) {

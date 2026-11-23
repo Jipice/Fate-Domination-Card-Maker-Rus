@@ -8,6 +8,7 @@ import { IoIosStar } from "react-icons/io";
 import { SideBarItem } from "./SideBarItem";
 import { Theme, THEME_KEY, applyTheme } from "./ThemeSwitch";
 import { FurinaChibi } from "./FurinaChibi";
+import { refreshLibrary, watchLibraryAuth } from "@/src/features/library/cache";
 
 const menuItems = [
   { label: "Главная", icon: PiDiamondsFourFill, link: "" },
@@ -38,6 +39,12 @@ export const SideBar = () => {
     useState<boolean>(false);
 
   // Restore saved size, collapsed state and theme after mount (avoids server/client mismatch).
+  // the library starts loading in the background on every page of the site
+  useEffect(() => {
+    watchLibraryAuth();
+    refreshLibrary().catch(() => {});
+  }, []);
+
   useEffect(() => {
     try {
       const savedWidth = Number(localStorage.getItem(WIDTH_KEY));
