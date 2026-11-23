@@ -17,6 +17,7 @@ type PackData = {
   version: 1;
   name: string;
   author: string | null;
+  cover?: string | null;
   token: string | null;
   figure: string | null;
   tiles: Tile[];
@@ -26,6 +27,7 @@ type PackData = {
 type Loaded = {
   name: string;
   author: string | null;
+  cover: string | null;
   token: string | null;
   figure: string | null;
   tiles: Tile[];
@@ -38,6 +40,28 @@ const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const buttonClass = "import-export-button bg-blue-500 hover:bg-blue-400 justify-center";
 const dangerClass = "import-export-button bg-gray-700 hover:bg-red-800 justify-center";
+
+// the picture that shows which character the pack is about; shrunk to keep the pack small
+function resizeImage(file: File, size = 256): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(size / img.width, size / img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("не удалось открыть картинку"));
+    };
+    img.src = url;
+  });
+}
 
 const totalCards = (l: Loaded) => l.categories.reduce((n, c) => n + c.cards.length, 0);
 
@@ -54,13 +78,14 @@ function fromParsed(p: Pack): Loaded {
       cards: p.singles.map((c) => ({ id: uid(), name: c.name, face: c.face, back: c.back })),
     });
   }
-  return { name: p.name, author: null, token: p.token, figure: p.figure, tiles: p.tiles, categories };
+  return { name: p.name, author: null, cover: null, token: p.token, figure: p.figure, tiles: p.tiles, categories };
 }
 
 function fromData(d: PackData): Loaded {
   return {
     name: d.name,
     author: d.author,
+    cover: d.cover ?? null,
     token: d.token,
     figure: d.figure,
     tiles: d.tiles,
@@ -78,6 +103,7 @@ function toData(l: Loaded, author: string | null): PackData {
     version: 1,
     name: l.name,
     author,
+    cover: l.cover,
     token: l.token,
     figure: l.figure,
     tiles: l.tiles,
@@ -116,6 +142,7 @@ const CardImage = ({
 
 const PacksPage = () => {
   const fileInput = useRef<HTMLInputElement>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -220,6 +247,16 @@ const PacksPage = () => {
   // ---- editing categories
 
   const update = (fn: (l: Loaded) => Loaded) => setLoaded((prev) => (prev ? fn(prev) : prev));
+
+  const setCover = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const cover = await resizeImage(file);
+      update((l) => ({ ...l, cover }));
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Не удалось загрузить картинку");
+    }
+  };
 
   const renameCategory = (id: string, title: string) =>
     update((l) => ({ ...l, categories: l.categories.map((c) => (c.id === id ? { ...c, title } : c)) }));
@@ -352,7 +389,36 @@ const PacksPage = () => {
 
       {loaded && (
         <>
-          <div className="flex flex-col gap-2 border border-black rounded p-3 bg-primary-dark-blue">
+          <div className="flex flex-wrap gap-4 border border-black rounded p-3 bg-primary-dark-blue">
+            <div className="flex flex-col gap-2 items-start">
+              {loaded.cover ? (
+                <img src={loaded.cover} alt="Картинка пака" className="w-32 h-32 object-cover rounded border border-black" />
+              ) : (
+                <div className="w-32 h-32 rounded border border-dashed border-gray-500 flex items-center justify-center text-xs text-gray-500 text-center">
+                  нет картинки
+                </div>
+              )}
+              <button className={buttonClass} onClick={() => coverInput.current?.click()}>
+                Картинка пака
+              </button>
+              {loaded.cover && (
+                <button className={dangerClass} onClick={() => update((l) => ({ ...l, cover: null }))}>
+                  Убрать
+                </button>
+              )}
+              <input
+                ref={coverInput}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  setCover(file);
+                }}
+              />
+            </div>
+            <div className="flex flex-col gap-2 flex-1 min-w-[16rem]">
             <label className="flex flex-col gap-1">
               <span className="field-header">Название пака</span>
               <input
@@ -374,6 +440,7 @@ const PacksPage = () => {
             <span className="text-sm text-gray-400">
               Карт: {totalCards(loaded)} · категорий: {loaded.categories.length} · плиток: {loaded.tiles.length}
             </span>
+            </div>
           </div>
 
           {(loaded.token || loaded.figure) && (
@@ -469,6 +536,12 @@ const PacksPage = () => {
             key={pack.id}
             className="flex flex-wrap items-center justify-between gap-3 border border-black rounded p-3 bg-primary-dark-blue"
           >
+            <div className="flex items-center gap-3 min-w-0">
+              {pack.data.cover ? (
+                <img src={pack.data.cover} alt="" className="w-16 h-16 object-cover rounded border border-black shrink-0" />
+              ) : (
+                <div className="w-16 h-16 rounded border border-dashed border-gray-500 shrink-0" />
+              )}
             <div className="flex flex-col">
               <span className="font-semibold">{pack.data.name}</span>
               <span className="text-sm text-gray-400">
@@ -476,6 +549,7 @@ const PacksPage = () => {
                 {pack.data.categories.reduce((n, c) => n + c.cards.length, 0)} · категорий:{" "}
                 {pack.data.categories.length}
               </span>
+            </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <button className={buttonClass} onClick={() => openPublic(pack)}>Открыть</button>

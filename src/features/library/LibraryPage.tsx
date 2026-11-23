@@ -133,7 +133,8 @@ const LibraryPage = () => {
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const [account, setAccount] = useState<string | null>(null);
+  // undefined = still checking the sign-in state, so we do not show "log in" by mistake
+  const [account, setAccount] = useState<string | null | undefined>(undefined);
 
   const reload = async () => {
     setCards(await listCards());
@@ -380,7 +381,9 @@ const LibraryPage = () => {
       </div>
 
       <p className="text-sm">
-        {account ? (
+        {account === undefined ? (
+          <>Проверяем вход…</>
+        ) : account ? (
           <>Карты в аккаунте <b>{account}</b>. Они доступны с любого устройства.</>
         ) : (
           <>Карты сохранены в этом браузере. <Link href="/account" className="underline text-blue-300">Войдите</Link>, чтобы хранить их в аккаунте.</>
