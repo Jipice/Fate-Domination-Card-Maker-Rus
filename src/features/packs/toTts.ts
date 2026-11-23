@@ -8,7 +8,7 @@ export const BOX_MESH_URL =
 
 // sizes taken from the packs made in the game (Adam Smasher, Kim Dokja)
 const TOKEN_SCALE = 0.4; // width and depth of the token; its height stays 1
-const TOKEN_THICKNESS = 0.295;
+const TOKEN_THICKNESS = 0.2;
 const BOX_SCALE = 2.35;
 
 export type PackLike = {
@@ -29,7 +29,7 @@ export type PackLike = {
 const WHITE = { r: 1, g: 1, b: 1 };
 
 export const DEFAULT_FIGURE_BASE = "#ffffff";
-export const DEFAULT_FIGURE_SCALE = 1.8;
+export const DEFAULT_FIGURE_SCALE = 1.6;
 
 export function hexToColor(hex: string | null | undefined): { r: number; g: number; b: number } {
   const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? "").trim());
