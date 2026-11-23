@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { IoHome, IoChevronBack, IoChevronForward, IoShapes } from "react-icons/io5";
 import { PiDiamondsFourFill } from "react-icons/pi";
 import { GiSwordInStone } from "react-icons/gi";
-import { FaInfoCircle, FaRegUserCircle, FaRegUser, FaSave, FaBoxOpen, FaUser } from "react-icons/fa";
+import { FaInfoCircle, FaRegUserCircle, FaRegUser, FaSave, FaBoxOpen, FaUser, FaTable } from "react-icons/fa";
 import { IoIosStar } from "react-icons/io";
 import { SideBarItem } from "./SideBarItem";
 import { Theme, THEME_KEY, applyTheme } from "./ThemeSwitch";
@@ -19,6 +19,7 @@ const menuItems = [
   { label: "Командное Заклинание", icon: IoIosStar, link: "command-seal" },
   { label: "Библиотека", icon: FaSave, link: "library" },
   { label: "Мастерская", icon: FaBoxOpen, link: "packs" },
+  { label: "Лист", icon: FaTable, link: "sheet" },
   { label: "Аккаунт", icon: FaUser, link: "account" },
 ];
 
