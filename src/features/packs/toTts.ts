@@ -20,7 +20,6 @@ export type PackLike = {
   figureBack?: string | null; // the back side of the figure (the front picture is used if empty)
   figureBase?: string | null; // colour of the figure's base, "#rrggbb"
   figureScale?: number | null; // size of the picture on the base
-  defaultBack?: string | null; // back for the cards that have no back of their own
   tiles: { name: string; image: string }[];
   categories: { title: string; cards: { name: string; face: string; back: string | null }[] }[];
 };
@@ -51,7 +50,6 @@ export function countNonLinkImages(pack: PackLike): number {
     pack.token,
     pack.figure,
     pack.figureBack ?? null,
-    pack.defaultBack ?? null,
     pack.boxImage ?? null,
   ];
   for (const tile of pack.tiles) all.push(tile.image);
@@ -106,8 +104,8 @@ export function toTts(pack: PackLike): Json {
     XmlUI: "",
   });
 
-  // a card without its own back gets the pack's default back, or else the first back found in the pack
-  let fallbackBack: string | null = isLink(pack.defaultBack) ? pack.defaultBack : null;
+  // a card without its own back gets the first back found in the pack
+  let fallbackBack: string | null = null;
   for (const cat of pack.categories) {
     for (const card of cat.cards) {
       if (!fallbackBack && isLink(card.back)) fallbackBack = card.back;

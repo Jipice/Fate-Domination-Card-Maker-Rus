@@ -3,6 +3,7 @@
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../cloud/supabase";
+import { CARD_BACK_PRESETS, presetForUrl } from "./cardBacks";
 import { Pack, parseTts } from "./parseTts";
 import { countNonLinkImages, DEFAULT_FIGURE_BASE, DEFAULT_FIGURE_SCALE, toTts } from "./toTts";
 import { makeThumbnail, makeZip } from "./zip";
@@ -26,7 +27,7 @@ type PackData = {
   figureBack?: string | null;
   figureBase?: string | null;
   figureScale?: number | null;
-  defaultBack?: string | null;
+  defaultBack?: string | null; // old packs only: it is copied onto the cards without a back when such a pack is opened
   tiles: Tile[];
   categories: { title: string; cards: { name: string; face: string; back: string | null }[] }[];
 };
@@ -41,7 +42,6 @@ type Loaded = {
   figureBack: string | null;
   figureBase: string;
   figureScale: number;
-  defaultBack: string | null;
   tiles: Tile[];
   categories: Category[];
   isPublic: boolean;
@@ -103,7 +103,6 @@ function emptyPack(): Loaded {
     figureBack: null,
     figureBase: DEFAULT_FIGURE_BASE,
     figureScale: DEFAULT_FIGURE_SCALE,
-    defaultBack: null,
     tiles: [],
     categories: [{ id: uid(), title: "Карты", cards: [] }],
     isPublic: true,
@@ -134,7 +133,6 @@ function fromParsed(p: Pack): Loaded {
     figureBack: p.figureBack,
     figureBase: p.figureBase ?? DEFAULT_FIGURE_BASE,
     figureScale: p.figureScale ?? DEFAULT_FIGURE_SCALE,
-    defaultBack: null,
     tiles: p.tiles,
     categories,
     isPublic: true,
@@ -145,7 +143,7 @@ function fromData(d: PackData, isPublic: boolean): Loaded {
   const categories: Category[] = d.categories.map((c) => ({
     id: uid(),
     title: c.title,
-    cards: c.cards.map((card) => ({ id: uid(), ...card })),
+    cards: c.cards.map((card) => ({ id: uid(), ...card, back: card.back ?? d.defaultBack ?? null })),
   }));
   if (!categories.length) categories.push({ id: uid(), title: "Карты", cards: [] });
   return {
@@ -158,7 +156,6 @@ function fromData(d: PackData, isPublic: boolean): Loaded {
     figureBack: d.figureBack ?? null,
     figureBase: d.figureBase ?? DEFAULT_FIGURE_BASE,
     figureScale: d.figureScale ?? DEFAULT_FIGURE_SCALE,
-    defaultBack: d.defaultBack ?? null,
     tiles: d.tiles,
     categories,
     isPublic,
@@ -178,7 +175,6 @@ function toData(l: Loaded, author: string | null): PackData {
     figureBack: l.figureBack,
     figureBase: l.figureBase,
     figureScale: l.figureScale,
-    defaultBack: l.defaultBack,
     tiles: l.tiles,
     categories: l.categories.map((c) => ({
       title: c.title,
@@ -226,62 +222,141 @@ const CardImage = ({
   />
 );
 
+// choice of a card back: one of the standard backs, none, or your own (a link or a file)
+const BackSelect = ({
+  value,
+  onChange,
+  onError,
+  compact = false,
+}: {
+  value: string | null;
+  onChange: (back: string | null) => void;
+  onError: (text: string) => void;
+  compact?: boolean;
+}) => {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [customMode, setCustomMode] = useState(() => !!value && !presetForUrl(value));
+  const [linkText, setLinkText] = useState(() => (value && /^https?:\/\//.test(value) && !presetForUrl(value) ? value : ""));
+
+  const preset = presetForUrl(value);
+  const mode = preset ? preset.id : value || customMode ? "custom" : "none";
+  const linkInvalid = linkText.trim() !== "" && !/^https?:\/\//.test(linkText.trim());
+
+  const choose = (id: string) => {
+    if (id === "none") {
+      setCustomMode(false);
+      setLinkText("");
+      onChange(null);
+    } else if (id === "custom") {
+      setCustomMode(true);
+      if (preset) onChange(null);
+    } else {
+      const picked = CARD_BACK_PRESETS.find((p) => p.id === id);
+      setCustomMode(false);
+      setLinkText("");
+      onChange(picked ? picked.url : null);
+    }
+  };
+
+  const typeLink = (text: string) => {
+    setLinkText(text);
+    const link = text.trim();
+    onChange(/^https?:\/\//.test(link) ? link : null);
+  };
+
+  const pickFile = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const data = await resizeImage(file, 700, 0.85);
+      setLinkText("");
+      onChange(data);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Не удалось загрузить картинку");
+    }
+  };
+
+  const selectStyle = compact ? { width: "7rem", height: "28px", padding: "0 4px" } : undefined;
+
+  return (
+    <div className={compact ? "flex flex-col gap-1 items-center" : "flex flex-wrap items-center gap-2"}>
+      <select
+        aria-label="Рубашка"
+        value={mode}
+        onChange={(e) => choose(e.target.value)}
+        className={compact ? "text-xs" : undefined}
+        style={selectStyle}
+      >
+        <option value="none">Без рубашки</option>
+        {CARD_BACK_PRESETS.map((p) => (
+          <option key={p.id} value={p.id}>{p.label}</option>
+        ))}
+        <option value="custom">Своя (ссылка или файл)</option>
+      </select>
+      {mode === "custom" && (
+        <>
+          <input
+            type="text"
+            aria-label="Ссылка на рубашку"
+            placeholder={value?.startsWith("data:") ? "загружен файл" : "https://..."}
+            value={linkText}
+            onChange={(e) => typeLink(e.target.value)}
+            className={compact ? "text-xs" : "flex-1 min-w-[12rem]"}
+            style={compact ? { width: "7rem", height: "28px", padding: "0 4px" } : undefined}
+          />
+          <button
+            type="button"
+            className={buttonClass}
+            style={compact ? { width: "7rem", height: "26px", fontSize: "0.7rem" } : undefined}
+            onClick={() => fileRef.current?.click()}
+          >
+            Файлом
+          </button>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              pickFile(file);
+            }}
+          />
+          {linkInvalid && <span className="text-xs text-red-400">Ссылка должна начинаться с http:// или https://</span>}
+        </>
+      )}
+    </div>
+  );
+};
+
 // form under every category: add a card by a link or by uploading pictures
 const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
   const fileRef = useRef<HTMLInputElement>(null);
-  const backFileRef = useRef<HTMLInputElement>(null);
   const [face, setFace] = useState("");
   const [name, setName] = useState("");
-  const [back, setBack] = useState("");
-  // a back picked from the computer (used when no back link is typed)
-  const [backData, setBackData] = useState<string | null>(null);
+  // the chosen back goes to every card added with this form
+  const [back, setBack] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const add = () => {
     const faceUrl = face.trim();
-    const backUrl = back.trim();
     if (!isImageSrc(faceUrl)) {
       setError("Вставьте ссылку на картинку карты (начинается с http:// или https://) или загрузите файл.");
       return;
     }
-    if (backUrl && !isImageSrc(backUrl)) {
-      setError("Ссылка на рубашку должна начинаться с http:// или https://");
-      return;
-    }
-    onAdd({ name: name.trim(), face: faceUrl, back: backUrl || backData });
+    onAdd({ name: name.trim(), face: faceUrl, back });
     setFace("");
     setName("");
-    setBack("");
-    setBackData(null);
     setError(null);
-  };
-
-  const pickBack = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      setBackData(await resizeImage(file, 700, 0.85));
-      setBack("");
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось загрузить картинку");
-    }
   };
 
   const upload = async (files: FileList | null) => {
     if (!files || !files.length) return;
-    const backUrl = back.trim();
-    if (backUrl && !isImageSrc(backUrl)) {
-      setError("Ссылка на рубашку должна начинаться с http:// или https://");
-      return;
-    }
     try {
       for (const file of Array.from(files)) {
         const data = await resizeImage(file, 700, 0.85);
-        // the chosen back (link or file) goes to every uploaded card
-        onAdd({ name: file.name.replace(/\.[^.]+$/, ""), face: data, back: backUrl || backData });
+        onAdd({ name: file.name.replace(/\.[^.]+$/, ""), face: data, back });
       }
-      setBack("");
-      setBackData(null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось загрузить картинку");
@@ -306,39 +381,17 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
           onChange={(e) => setName(e.target.value)}
           className="flex-1 min-w-[10rem]"
         />
-        <input
-          type="text"
-          placeholder="Рубашка, ссылка (необязательно)"
-          value={back}
-          onChange={(e) => {
-            setBack(e.target.value);
-            if (e.target.value) setBackData(null);
-          }}
-          className="flex-1 min-w-[10rem]"
-        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-gray-400">Рубашка:</span>
+        <BackSelect value={back} onChange={setBack} onError={setError} />
+        {back && (
+          <img src={back} alt="Рубашка" className="w-8 h-12 object-contain rounded border border-black bg-black/40" />
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button className={buttonClass} onClick={add}>Добавить по ссылке</button>
         <button className={buttonClass} onClick={() => fileRef.current?.click()}>Загрузить файлы</button>
-        <button className={buttonClass} onClick={() => backFileRef.current?.click()}>Рубашка файлом</button>
-        <input
-          ref={backFileRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            pickBack(file);
-          }}
-        />
-        {backData && (
-          <span className="flex items-center gap-1 text-xs text-gray-300">
-            <img src={backData} alt="Рубашка" className="w-8 h-12 object-contain rounded border border-black bg-black/40" />
-            выбрана
-            <button className="underline" onClick={() => setBackData(null)}>убрать</button>
-          </span>
-        )}
         <input
           ref={fileRef}
           type="file"
@@ -353,8 +406,8 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
           }}
         />
         <span className="text-xs text-gray-500">
-          Рубашка (ссылкой или файлом) ставится на все карты, которые вы добавляете этой кнопкой. Ссылка легче:
-          загруженные файлы сжимаются, но всё равно увеличивают размер пака.
+          Выбранная рубашка ставится на все карты, которые вы добавляете этими кнопками. Стандартные рубашки и ссылки
+          легче: загруженные файлы сжимаются, но всё равно увеличивают размер пака.
         </span>
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
@@ -367,9 +420,6 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
 const PacksPage = () => {
   const fileInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
-  const cardBackInput = useRef<HTMLInputElement>(null);
-  const cardBackTarget = useRef<string | null>(null);
-  const defaultBackInput = useRef<HTMLInputElement>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   // id of the cloud pack that is being edited; null = a new pack that is not saved yet
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -578,45 +628,6 @@ const PacksPage = () => {
       })),
     }));
 
-  // a back for one card chosen from the computer
-  const pickCardBack = async (file: File | undefined) => {
-    const target = cardBackTarget.current;
-    cardBackTarget.current = null;
-    if (!file || !target) return;
-    try {
-      setCardBack(target, await resizeImage(file, 700, 0.85));
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Не удалось загрузить картинку");
-    }
-  };
-
-  // a back for one card typed as a link
-  const askCardBackLink = (card: Item) => {
-    const value = window.prompt("Ссылка на рубашку (http:// или https://)", card.back && /^https?:/.test(card.back) ? card.back : "");
-    if (value === null) return;
-    const link = value.trim();
-    if (!link) {
-      setCardBack(card.id, null);
-      return;
-    }
-    if (!/^https?:\/\//.test(link)) {
-      setMessage("Ссылка на рубашку должна начинаться с http:// или https://");
-      return;
-    }
-    setCardBack(card.id, link);
-  };
-
-  // the default back for the whole pack, chosen from the computer
-  const pickDefaultBack = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const data = await resizeImage(file, 700, 0.85);
-      update((l) => ({ ...l, defaultBack: data }));
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Не удалось загрузить картинку");
-    }
-  };
-
   const moveCard = (cardId: string, toId: string) =>
     update((l) => {
       let moved: Item | undefined;
@@ -688,7 +699,6 @@ const PacksPage = () => {
     if (l.token && !isImageSrc(l.token)) return "Ссылка на жетон должна начинаться с http:// или https://";
     if (l.figure && !isImageSrc(l.figure)) return "Ссылка на фигурку должна начинаться с http:// или https://";
     if (l.figureBack && !isImageSrc(l.figureBack)) return "Ссылка на заднюю сторону фигурки должна начинаться с http:// или https://";
-    if (l.defaultBack && !isImageSrc(l.defaultBack)) return "Рубашка по умолчанию: нужна ссылка (http:// или https://) или файл.";
     if (l.boxImage && !isImageSrc(l.boxImage)) return "Ссылка на текстуру коробки должна начинаться с http:// или https://";
     const size = new Blob([JSON.stringify(toData(l, nickname.trim()))]).size;
     if (size > MAX_PACK_BYTES) {
@@ -933,55 +943,6 @@ const PacksPage = () => {
                   onChange={(e) => changeNickname(e.target.value)}
                 />
               </label>
-              <label className="flex flex-col gap-1">
-                <span className="field-header">Текстура коробки для игры (ссылка)</span>
-                <input
-                  type="text"
-                  value={loaded.boxImage ?? ""}
-                  placeholder="https://... (картинка со страницы «Коробка мастера»)"
-                  onChange={(e) => update((l) => ({ ...l, boxImage: e.target.value.trim() || null }))}
-                />
-              </label>
-              <div className="flex flex-col gap-1">
-                <span className="field-header font-semibold">Рубашка по умолчанию (для карт без своей рубашки)</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="text"
-                    value={loaded.defaultBack && !loaded.defaultBack.startsWith("data:") ? loaded.defaultBack : ""}
-                    placeholder={loaded.defaultBack?.startsWith("data:") ? "загружен файл" : "https://..."}
-                    onChange={(e) => update((l) => ({ ...l, defaultBack: e.target.value.trim() || null }))}
-                    className="flex-1 min-w-[12rem]"
-                  />
-                  <button className={buttonClass} onClick={() => defaultBackInput.current?.click()}>Файлом</button>
-                  {loaded.defaultBack && isImageSrc(loaded.defaultBack) && (
-                    <>
-                      <img
-                        src={loaded.defaultBack}
-                        alt="Рубашка по умолчанию"
-                        onClick={() => openZoom(loaded.defaultBack!, "Рубашка по умолчанию")}
-                        className="w-10 h-14 object-contain rounded border border-black bg-black/40 cursor-zoom-in"
-                      />
-                      <button className={dangerClass} onClick={() => update((l) => ({ ...l, defaultBack: null }))}>
-                        Убрать
-                      </button>
-                    </>
-                  )}
-                  <input
-                    ref={defaultBackInput}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      pickDefaultBack(file);
-                    }}
-                  />
-                </div>
-                <span className="text-xs text-gray-500">
-                  Хранится один раз на весь пак, поэтому файл здесь не раздувает размер, как рубашка на каждой карте.
-                </span>
-              </div>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -1013,6 +974,20 @@ const PacksPage = () => {
                 </label>
                 {loaded.token && isImageSrc(loaded.token) && (
                   <CardImage src={loaded.token} alt="Жетон" testId="token" onOpen={openZoom} />
+                )}
+              </div>
+              <div className="flex flex-col gap-2 flex-1 min-w-[14rem]">
+                <label className="flex flex-col gap-1">
+                  <span className="field-header">Текстура коробки для игры (ссылка)</span>
+                  <input
+                    type="text"
+                    value={loaded.boxImage ?? ""}
+                    placeholder="https://... (со страницы «Коробка мастера»)"
+                    onChange={(e) => update((l) => ({ ...l, boxImage: e.target.value.trim() || null }))}
+                  />
+                </label>
+                {loaded.boxImage && isImageSrc(loaded.boxImage) && (
+                  <CardImage src={loaded.boxImage} alt="Текстура коробки" testId="box-image" onOpen={openZoom} />
                 )}
               </div>
               <div className="flex flex-col gap-2 flex-1 min-w-[14rem]">
@@ -1118,18 +1093,6 @@ const PacksPage = () => {
             </div>
           </section>
 
-          <input
-            ref={cardBackInput}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              pickCardBack(file);
-            }}
-          />
-
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold">Категории</h2>
@@ -1162,35 +1125,12 @@ const PacksPage = () => {
                     <div key={card.id} className="flex flex-col gap-1 items-center w-28">
                       <CardImage src={card.face} alt={card.name || "Карта"} testId="card" onOpen={openZoom} />
                       {card.back && <CardImage src={card.back} alt="Рубашка" testId="back" onOpen={openZoom} />}
-                      <div className="flex gap-1">
-                        <button
-                          className={buttonClass}
-                          style={{ width: "3.4rem", height: "26px", fontSize: "0.7rem" }}
-                          title="Выбрать рубашку этой карты файлом"
-                          onClick={() => {
-                            cardBackTarget.current = card.id;
-                            cardBackInput.current?.click();
-                          }}
-                        >
-                          Файл
-                        </button>
-                        <button
-                          className={buttonClass}
-                          style={{ width: "3.4rem", height: "26px", fontSize: "0.7rem" }}
-                          title="Указать ссылку на рубашку этой карты"
-                          onClick={() => askCardBackLink(card)}
-                        >
-                          Ссылка
-                        </button>
-                      </div>
-                      {card.back && (
-                        <button
-                          className="text-xs underline text-gray-400"
-                          onClick={() => setCardBack(card.id, null)}
-                        >
-                          убрать рубашку
-                        </button>
-                      )}
+                      <BackSelect
+                        compact
+                        value={card.back}
+                        onChange={(back) => setCardBack(card.id, back)}
+                        onError={setMessage}
+                      />
                       <input
                         type="text"
                         aria-label="Название карты"
