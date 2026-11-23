@@ -432,13 +432,18 @@ const PacksPage = () => {
                     <div key={card.id} className="flex flex-col gap-1 items-center w-28">
                       <CardImage src={card.face} alt={card.name || "Карта"} testId="card" onOpen={openZoom} />
                       {card.back && <CardImage src={card.back} alt="Рубашка" testId="back" onOpen={openZoom} />}
-                      {card.name && <span className="text-xs text-gray-400 text-center">{card.name}</span>}
+                      {card.name && (
+                        <span className="text-xs text-gray-400 text-center truncate w-28" title={card.name}>
+                          {card.name}
+                        </span>
+                      )}
                       {loaded.categories.length > 1 && (
                         <select
                           aria-label="Переместить в категорию"
                           value={cat.id}
                           onChange={(e) => moveCard(card.id, e.target.value)}
-                          className="w-28 text-xs"
+                          className="text-xs"
+                          style={{ width: "7rem", height: "28px", padding: "0 4px" }}
                         >
                           {loaded.categories.map((c) => (
                             <option key={c.id} value={c.id}>{c.title}</option>

@@ -145,7 +145,7 @@ input::-webkit-inner-spin-button {
 
 /* Furina theme: dark panel behind the page content so text stays readable over the artwork */
 [data-theme="furina"] main {
-  background: rgba(6, 12, 34, 0.78);
+  background: rgba(6, 12, 34, 0.55);
   border-radius: 12px;
   padding: 16px;
 }
