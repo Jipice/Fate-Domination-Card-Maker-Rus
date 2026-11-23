@@ -11,13 +11,13 @@ import { FurinaChibi } from "./FurinaChibi";
 
 const menuItems = [
   { label: "Главная", icon: PiDiamondsFourFill, link: "" },
-  { label: "Призыв слуги", icon: GiSwordInStone, link: "servant-summon" },
-  { label: "Жетон мастера", icon: FaRegUserCircle, link: "master-token" },
-  { label: "Фигурка мастера", icon: FaRegUser, link: "master-standee" },
-  { label: "Коробка мастера", icon: IoShapes, link: "master-box" },
+  { label: "Призыв Слуги", icon: GiSwordInStone, link: "servant-summon" },
+  { label: "Жетон Мастера", icon: FaRegUserCircle, link: "master-token" },
+  { label: "Фигурка Мастера", icon: FaRegUser, link: "master-standee" },
+  { label: "Коробка Мастера", icon: IoShapes, link: "master-box" },
   { label: "Командное Заклинание", icon: IoIosStar, link: "command-seal" },
   { label: "Библиотека", icon: FaSave, link: "library" },
-  { label: "Паки", icon: FaBoxOpen, link: "packs" },
+  { label: "Мастерская", icon: FaBoxOpen, link: "packs" },
   { label: "Аккаунт", icon: FaUser, link: "account" },
 ];
 
@@ -115,7 +115,7 @@ export const SideBar = () => {
             {!collapsed && (
               <h1 className="font-bold flex gap-2 p-1 items-start text-sm select-none min-w-0">
                 <IoHome className="shrink-0 mt-0.5" />
-                <span className="break-words">Создатель карт Fate/Domination</span>
+                <span className="break-words">Создатель Карт Fate/Domination</span>
               </h1>
             )}
             <button
@@ -147,7 +147,7 @@ export const SideBar = () => {
               <hr className="mt-2 mb-2" />
               <SideBarItem
                 icon={FaInfoCircle}
-                label="Информация и контакты"
+                label="Информация И Контакты"
                 link="info-contact"
                 collapsed={collapsed}
               />
@@ -176,7 +176,7 @@ export const SideBar = () => {
           >
             <h1 className="font-bold flex gap-2 p-1 items-center text-sm select-none">
               <IoHome />
-              Создатель карт Fate/Domination
+              Создатель Карт Fate/Domination
             </h1>
             <hr className="mt-1 mb-2" />
             <div className="flex flex-col justify-between flex-1">
@@ -195,7 +195,7 @@ export const SideBar = () => {
                 <hr className="mt-2 mb-2" />
                 <SideBarItem
                   icon={FaInfoCircle}
-                  label="Информация и контакты"
+                  label="Информация И Контакты"
                   link="info-contact"
                   onNavigate={() => setShowResponsiveSideBar(false)}
                 />

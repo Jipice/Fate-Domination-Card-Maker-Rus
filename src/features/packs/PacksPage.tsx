@@ -3,10 +3,11 @@
 import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../cloud/supabase";
-import { CARD_BACK_PRESETS, presetForUrl } from "./cardBacks";
 import { Pack, parseTts } from "./parseTts";
-import { countNonLinkImages, DEFAULT_FIGURE_BASE, DEFAULT_FIGURE_SCALE, toTts } from "./toTts";
+import { countNonLinkImages, toTts } from "./toTts";
 import { makeThumbnail, makeZip } from "./zip";
+import { listCards } from "../library/storage";
+import type { CardRecord } from "../library/db";
 
 // ---- data shapes
 
@@ -24,10 +25,6 @@ type PackData = {
   boxImage?: string | null;
   token: string | null;
   figure: string | null;
-  figureBack?: string | null;
-  figureBase?: string | null;
-  figureScale?: number | null;
-  defaultBack?: string | null; // old packs only: it is copied onto the cards without a back when such a pack is opened
   tiles: Tile[];
   categories: { title: string; cards: { name: string; face: string; back: string | null }[] }[];
 };
@@ -39,9 +36,6 @@ type Loaded = {
   boxImage: string | null;
   token: string | null;
   figure: string | null;
-  figureBack: string | null;
-  figureBase: string;
-  figureScale: number;
   tiles: Tile[];
   categories: Category[];
   isPublic: boolean;
@@ -100,9 +94,6 @@ function emptyPack(): Loaded {
     boxImage: null,
     token: null,
     figure: null,
-    figureBack: null,
-    figureBase: DEFAULT_FIGURE_BASE,
-    figureScale: DEFAULT_FIGURE_SCALE,
     tiles: [],
     categories: [{ id: uid(), title: "Карты", cards: [] }],
     isPublic: true,
@@ -130,9 +121,6 @@ function fromParsed(p: Pack): Loaded {
     boxImage: p.boxImage,
     token: p.token,
     figure: p.figure,
-    figureBack: p.figureBack,
-    figureBase: p.figureBase ?? DEFAULT_FIGURE_BASE,
-    figureScale: p.figureScale ?? DEFAULT_FIGURE_SCALE,
     tiles: p.tiles,
     categories,
     isPublic: true,
@@ -143,7 +131,7 @@ function fromData(d: PackData, isPublic: boolean): Loaded {
   const categories: Category[] = d.categories.map((c) => ({
     id: uid(),
     title: c.title,
-    cards: c.cards.map((card) => ({ id: uid(), ...card, back: card.back ?? d.defaultBack ?? null })),
+    cards: c.cards.map((card) => ({ id: uid(), ...card })),
   }));
   if (!categories.length) categories.push({ id: uid(), title: "Карты", cards: [] });
   return {
@@ -153,9 +141,6 @@ function fromData(d: PackData, isPublic: boolean): Loaded {
     boxImage: d.boxImage ?? null,
     token: d.token,
     figure: d.figure,
-    figureBack: d.figureBack ?? null,
-    figureBase: d.figureBase ?? DEFAULT_FIGURE_BASE,
-    figureScale: d.figureScale ?? DEFAULT_FIGURE_SCALE,
     tiles: d.tiles,
     categories,
     isPublic,
@@ -172,9 +157,6 @@ function toData(l: Loaded, author: string | null): PackData {
     boxImage: l.boxImage,
     token: l.token,
     figure: l.figure,
-    figureBack: l.figureBack,
-    figureBase: l.figureBase,
-    figureScale: l.figureScale,
     tiles: l.tiles,
     categories: l.categories.map((c) => ({
       title: c.title,
@@ -222,131 +204,29 @@ const CardImage = ({
   />
 );
 
-// choice of a card back: one of the standard backs, none, or your own (a link or a file)
-const BackSelect = ({
-  value,
-  onChange,
-  onError,
-  compact = false,
-}: {
-  value: string | null;
-  onChange: (back: string | null) => void;
-  onError: (text: string) => void;
-  compact?: boolean;
-}) => {
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [customMode, setCustomMode] = useState(() => !!value && !presetForUrl(value));
-  const [linkText, setLinkText] = useState(() => (value && /^https?:\/\//.test(value) && !presetForUrl(value) ? value : ""));
-
-  const preset = presetForUrl(value);
-  const mode = preset ? preset.id : value || customMode ? "custom" : "none";
-  const linkInvalid = linkText.trim() !== "" && !/^https?:\/\//.test(linkText.trim());
-
-  const choose = (id: string) => {
-    if (id === "none") {
-      setCustomMode(false);
-      setLinkText("");
-      onChange(null);
-    } else if (id === "custom") {
-      setCustomMode(true);
-      if (preset) onChange(null);
-    } else {
-      const picked = CARD_BACK_PRESETS.find((p) => p.id === id);
-      setCustomMode(false);
-      setLinkText("");
-      onChange(picked ? picked.url : null);
-    }
-  };
-
-  const typeLink = (text: string) => {
-    setLinkText(text);
-    const link = text.trim();
-    onChange(/^https?:\/\//.test(link) ? link : null);
-  };
-
-  const pickFile = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      const data = await resizeImage(file, 700, 0.85);
-      setLinkText("");
-      onChange(data);
-    } catch (err) {
-      onError(err instanceof Error ? err.message : "Не удалось загрузить картинку");
-    }
-  };
-
-  const selectStyle = compact ? { width: "7rem", height: "28px", padding: "0 4px" } : undefined;
-
-  return (
-    <div className={compact ? "flex flex-col gap-1 items-center" : "flex flex-wrap items-center gap-2"}>
-      <select
-        aria-label="Рубашка"
-        value={mode}
-        onChange={(e) => choose(e.target.value)}
-        className={compact ? "text-xs" : undefined}
-        style={selectStyle}
-      >
-        <option value="none">Без рубашки</option>
-        {CARD_BACK_PRESETS.map((p) => (
-          <option key={p.id} value={p.id}>{p.label}</option>
-        ))}
-        <option value="custom">Своя (ссылка или файл)</option>
-      </select>
-      {mode === "custom" && (
-        <>
-          <input
-            type="text"
-            aria-label="Ссылка на рубашку"
-            placeholder={value?.startsWith("data:") ? "загружен файл" : "https://..."}
-            value={linkText}
-            onChange={(e) => typeLink(e.target.value)}
-            className={compact ? "text-xs" : "flex-1 min-w-[12rem]"}
-            style={compact ? { width: "7rem", height: "28px", padding: "0 4px" } : undefined}
-          />
-          <button
-            type="button"
-            className={buttonClass}
-            style={compact ? { width: "7rem", height: "26px", fontSize: "0.7rem" } : undefined}
-            onClick={() => fileRef.current?.click()}
-          >
-            Файлом
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              pickFile(file);
-            }}
-          />
-          {linkInvalid && <span className="text-xs text-red-400">Ссылка должна начинаться с http:// или https://</span>}
-        </>
-      )}
-    </div>
-  );
-};
-
 // form under every category: add a card by a link or by uploading pictures
 const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [face, setFace] = useState("");
   const [name, setName] = useState("");
-  // the chosen back goes to every card added with this form
-  const [back, setBack] = useState<string | null>(null);
+  const [back, setBack] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const add = () => {
     const faceUrl = face.trim();
+    const backUrl = back.trim();
     if (!isImageSrc(faceUrl)) {
       setError("Вставьте ссылку на картинку карты (начинается с http:// или https://) или загрузите файл.");
       return;
     }
-    onAdd({ name: name.trim(), face: faceUrl, back });
+    if (backUrl && !isImageSrc(backUrl)) {
+      setError("Ссылка на рубашку должна начинаться с http:// или https://");
+      return;
+    }
+    onAdd({ name: name.trim(), face: faceUrl, back: backUrl || null });
     setFace("");
     setName("");
+    setBack("");
     setError(null);
   };
 
@@ -355,7 +235,7 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
     try {
       for (const file of Array.from(files)) {
         const data = await resizeImage(file, 700, 0.85);
-        onAdd({ name: file.name.replace(/\.[^.]+$/, ""), face: data, back });
+        onAdd({ name: file.name.replace(/\.[^.]+$/, ""), face: data, back: null });
       }
       setError(null);
     } catch (err) {
@@ -381,13 +261,13 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
           onChange={(e) => setName(e.target.value)}
           className="flex-1 min-w-[10rem]"
         />
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-gray-400">Рубашка:</span>
-        <BackSelect value={back} onChange={setBack} onError={setError} />
-        {back && (
-          <img src={back} alt="Рубашка" className="w-8 h-12 object-contain rounded border border-black bg-black/40" />
-        )}
+        <input
+          type="text"
+          placeholder="Рубашка, ссылка (необязательно)"
+          value={back}
+          onChange={(e) => setBack(e.target.value)}
+          className="flex-1 min-w-[10rem]"
+        />
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <button className={buttonClass} onClick={add}>Добавить по ссылке</button>
@@ -406,8 +286,7 @@ const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
           }}
         />
         <span className="text-xs text-gray-500">
-          Выбранная рубашка ставится на все карты, которые вы добавляете этими кнопками. Стандартные рубашки и ссылки
-          легче: загруженные файлы сжимаются, но всё равно увеличивают размер пака.
+          Ссылка легче: загруженные файлы сжимаются, но всё равно увеличивают размер пака.
         </span>
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
@@ -428,6 +307,9 @@ const PacksPage = () => {
   const [packs, setPacks] = useState<CloudPack[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [libOpen, setLibOpen] = useState(false);
+  const [libCards, setLibCards] = useState<CardRecord[]>([]);
+  const [libCategory, setLibCategory] = useState<string>("");
   const [nickname, setNickname] = useState("");
   const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
   const [scale, setScale] = useState(1);
@@ -577,6 +459,33 @@ const PacksPage = () => {
   const renameCategory = (id: string, title: string) =>
     update((l) => ({ ...l, categories: l.categories.map((c) => (c.id === id ? { ...c, title } : c)) }));
 
+  const openLibrary = async () => {
+    const list = await listCards();
+    setLibCards(list.sort((a, b) => b.savedAt - a.savedAt));
+    setLibCategory((prev) => prev || (loaded?.categories[0]?.id ?? ""));
+    setLibOpen(true);
+  };
+
+  // a library card becomes a card of the pack; its small preview is used as the picture
+  const addFromLibrary = (record: CardRecord) => {
+    if (!loaded) return;
+    if (!record.thumbnail) {
+      setMessage(`У карты «${record.name}» нет превью: откройте её в редакторе и сохраните, тогда она появится в паке.`);
+      return;
+    }
+    const target = libCategory || loaded.categories[0]?.id;
+    if (!target) return;
+    update((l) => ({
+      ...l,
+      categories: l.categories.map((c) =>
+        c.id === target
+          ? { ...c, cards: [...c.cards, { id: uid(), name: record.name, face: record.thumbnail as string, back: null }] }
+          : c,
+      ),
+    }));
+    setMessage(`Карта «${record.name}» добавлена.`);
+  };
+
   const addCategory = () =>
     update((l) => ({
       ...l,
@@ -616,15 +525,6 @@ const PacksPage = () => {
       categories: l.categories.map((c) => ({
         ...c,
         cards: c.cards.map((x) => (x.id === cardId ? { ...x, name } : x)),
-      })),
-    }));
-
-  const setCardBack = (cardId: string, back: string | null) =>
-    update((l) => ({
-      ...l,
-      categories: l.categories.map((c) => ({
-        ...c,
-        cards: c.cards.map((x) => (x.id === cardId ? { ...x, back } : x)),
       })),
     }));
 
@@ -698,7 +598,6 @@ const PacksPage = () => {
     if (!nickname.trim()) return "Введите ник: так вас увидят в общем списке.";
     if (l.token && !isImageSrc(l.token)) return "Ссылка на жетон должна начинаться с http:// или https://";
     if (l.figure && !isImageSrc(l.figure)) return "Ссылка на фигурку должна начинаться с http:// или https://";
-    if (l.figureBack && !isImageSrc(l.figureBack)) return "Ссылка на заднюю сторону фигурки должна начинаться с http:// или https://";
     if (l.boxImage && !isImageSrc(l.boxImage)) return "Ссылка на текстуру коробки должна начинаться с http:// или https://";
     const size = new Blob([JSON.stringify(toData(l, nickname.trim()))]).size;
     if (size > MAX_PACK_BYTES) {
@@ -831,6 +730,49 @@ const PacksPage = () => {
 
   return (
     <div className="flex flex-col gap-6 w-full max-w-5xl">
+      {libOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLibOpen(false)}
+        >
+          <div
+            className="flex flex-col gap-3 w-full max-w-3xl max-h-[85vh] bg-primary-dark-blue border border-black rounded p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-semibold">Карты из библиотеки</h2>
+              <button className={dangerClass} onClick={() => setLibOpen(false)}>Закрыть</button>
+            </div>
+            {loaded && loaded.categories.length > 0 && (
+              <label className="flex flex-col gap-1">
+                <span className="field-header">Добавить в категорию</span>
+                <select value={libCategory} onChange={(e) => setLibCategory(e.target.value)}>
+                  {loaded.categories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.title}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <div className="overflow-y-auto flex flex-col gap-2">
+              {libCards.length === 0 && <p className="italic text-gray-400">В библиотеке пока нет карт.</p>}
+              {libCards.map((record) => (
+                <div key={record.id} className="flex items-center justify-between gap-3 border border-black rounded p-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {record.thumbnail ? (
+                      <img src={record.thumbnail} alt="" className="w-12 h-auto rounded border border-black shrink-0" />
+                    ) : (
+                      <div className="w-12 h-16 rounded border border-dashed border-gray-500 shrink-0" />
+                    )}
+                    <span className="truncate">{record.name}</span>
+                  </div>
+                  <button className={buttonClass} onClick={() => addFromLibrary(record)}>Добавить</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {zoom && (
         <div
           className="fixed inset-0 z-50 bg-black/85 flex flex-col items-center justify-center gap-3 p-4"
@@ -850,7 +792,7 @@ const PacksPage = () => {
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Паки</h1>
+        <h1 className="text-xl font-semibold">Мастерская</h1>
         <div className="flex flex-wrap gap-2">
           {loaded && (
             <>
@@ -888,7 +830,7 @@ const PacksPage = () => {
       {!loaded && (
         <p className="italic text-gray-400">
           Нажмите «Создать пак», чтобы собрать пак прямо на сайте, или загрузите файл Tabletop (.json) из папки{" "}
-          <b>Documents\My Games\Tabletop Simulator\Saves\Saved Objects </b>. Свои паки
+          <b>Documents\My Games\Tabletop Simulator\Saves</b> (объекты из Saved Objects лежат в подпапке). Свои паки
           можно в любой момент открыть из списка ниже и поправить.
         </p>
       )}
@@ -943,6 +885,15 @@ const PacksPage = () => {
                   onChange={(e) => changeNickname(e.target.value)}
                 />
               </label>
+              <label className="flex flex-col gap-1">
+                <span className="field-header">Текстура коробки для игры (ссылка)</span>
+                <input
+                  type="text"
+                  value={loaded.boxImage ?? ""}
+                  placeholder="https://... (картинка со страницы «Коробка мастера»)"
+                  onChange={(e) => update((l) => ({ ...l, boxImage: e.target.value.trim() || null }))}
+                />
+              </label>
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -978,20 +929,6 @@ const PacksPage = () => {
               </div>
               <div className="flex flex-col gap-2 flex-1 min-w-[14rem]">
                 <label className="flex flex-col gap-1">
-                  <span className="field-header">Текстура коробки для игры (ссылка)</span>
-                  <input
-                    type="text"
-                    value={loaded.boxImage ?? ""}
-                    placeholder="https://... (со страницы «Коробка мастера»)"
-                    onChange={(e) => update((l) => ({ ...l, boxImage: e.target.value.trim() || null }))}
-                  />
-                </label>
-                {loaded.boxImage && isImageSrc(loaded.boxImage) && (
-                  <CardImage src={loaded.boxImage} alt="Текстура коробки" testId="box-image" onOpen={openZoom} />
-                )}
-              </div>
-              <div className="flex flex-col gap-2 flex-1 min-w-[14rem]">
-                <label className="flex flex-col gap-1">
                   <span className="field-header">Фигурка (ссылка на картинку)</span>
                   <input
                     type="text"
@@ -1000,63 +937,9 @@ const PacksPage = () => {
                     onChange={(e) => update((l) => ({ ...l, figure: e.target.value.trim() || null }))}
                   />
                 </label>
-                <label className="flex flex-col gap-1">
-                  <span className="field-header">Задняя сторона фигурки (ссылка, необязательно)</span>
-                  <input
-                    type="text"
-                    value={loaded.figureBack ?? ""}
-                    placeholder="если пусто, сзади та же картинка"
-                    onChange={(e) => update((l) => ({ ...l, figureBack: e.target.value.trim() || null }))}
-                  />
-                </label>
-                <div className="flex flex-wrap gap-3">
-                  {loaded.figure && isImageSrc(loaded.figure) && (
-                    <CardImage src={loaded.figure} alt="Фигурка" testId="figure" onOpen={openZoom} />
-                  )}
-                  {loaded.figureBack && isImageSrc(loaded.figureBack) && (
-                    <CardImage src={loaded.figureBack} alt="Задняя сторона фигурки" testId="figure-back" onOpen={openZoom} />
-                  )}
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="field-header font-semibold">Подставка (нижняя часть)</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="color"
-                      aria-label="Цвет подставки"
-                      value={loaded.figureBase}
-                      onChange={(e) => update((l) => ({ ...l, figureBase: e.target.value }))}
-                      style={{ width: "3rem", height: "2.25rem", padding: 0, cursor: "pointer" }}
-                    />
-                    <span className="text-sm text-gray-300">{loaded.figureBase}</span>
-                    {["#ffffff", "#4a7bd0", "#c0392b", "#2e8b57", "#222222"].map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        aria-label={`Цвет подставки ${c}`}
-                        onClick={() => update((l) => ({ ...l, figureBase: c }))}
-                        style={{ background: c, width: "1.75rem", height: "1.75rem" }}
-                        className="rounded-full border border-gray-400 cursor-pointer"
-                      />
-                    ))}
-                  </div>
-                </div>
-                <label className="flex flex-col gap-1">
-                  <span className="field-header font-semibold">
-                    Размер фигурки на подставке: ×{loaded.figureScale.toFixed(1)}
-                  </span>
-                  <input
-                    type="range"
-                    min={0.5}
-                    max={4}
-                    step={0.1}
-                    value={loaded.figureScale}
-                    onChange={(e) => update((l) => ({ ...l, figureScale: Number(e.target.value) }))}
-                    style={{ width: "14rem" }}
-                  />
-                  <span className="text-xs text-gray-500">
-                    Подставка остаётся прежнего размера, меняется только сама картинка. Обычно хватает 1.5–2.
-                  </span>
-                </label>
+                {loaded.figure && isImageSrc(loaded.figure) && (
+                  <CardImage src={loaded.figure} alt="Фигурка" testId="figure" onOpen={openZoom} />
+                )}
               </div>
             </div>
           </section>
@@ -1096,7 +979,10 @@ const PacksPage = () => {
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold">Категории</h2>
-              <button className={buttonClass} onClick={addCategory}>Добавить категорию</button>
+              <div className="flex flex-wrap gap-2">
+                <button className={buttonClass} onClick={openLibrary}>Добавить из библиотеки</button>
+                <button className={buttonClass} onClick={addCategory}>Добавить категорию</button>
+              </div>
             </div>
 
             {loaded.categories.map((cat) => (
@@ -1125,12 +1011,6 @@ const PacksPage = () => {
                     <div key={card.id} className="flex flex-col gap-1 items-center w-28">
                       <CardImage src={card.face} alt={card.name || "Карта"} testId="card" onOpen={openZoom} />
                       {card.back && <CardImage src={card.back} alt="Рубашка" testId="back" onOpen={openZoom} />}
-                      <BackSelect
-                        compact
-                        value={card.back}
-                        onChange={(back) => setCardBack(card.id, back)}
-                        onError={setMessage}
-                      />
                       <input
                         type="text"
                         aria-label="Название карты"
