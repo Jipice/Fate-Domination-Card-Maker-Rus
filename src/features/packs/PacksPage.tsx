@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "../cloud/supabase";
 import { Pack, parseTts } from "./parseTts";
 import { countNonLinkImages, toTts } from "./toTts";
+import { makeThumbnail, makeZip } from "./zip";
 
 // ---- data shapes
 
@@ -19,6 +20,7 @@ type PackData = {
   name: string;
   author: string | null;
   cover?: string | null;
+  boxImage?: string | null;
   token: string | null;
   figure: string | null;
   tiles: Tile[];
@@ -29,6 +31,7 @@ type Loaded = {
   name: string;
   author: string | null;
   cover: string | null;
+  boxImage: string | null;
   token: string | null;
   figure: string | null;
   tiles: Tile[];
@@ -86,6 +89,7 @@ function emptyPack(): Loaded {
     name: "Новый пак",
     author: null,
     cover: null,
+    boxImage: null,
     token: null,
     figure: null,
     tiles: [],
@@ -112,6 +116,7 @@ function fromParsed(p: Pack): Loaded {
     name: p.name,
     author: null,
     cover: null,
+    boxImage: p.boxImage,
     token: p.token,
     figure: p.figure,
     tiles: p.tiles,
@@ -131,6 +136,7 @@ function fromData(d: PackData, isPublic: boolean): Loaded {
     name: d.name,
     author: d.author,
     cover: d.cover ?? null,
+    boxImage: d.boxImage ?? null,
     token: d.token,
     figure: d.figure,
     tiles: d.tiles,
@@ -146,6 +152,7 @@ function toData(l: Loaded, author: string | null): PackData {
     name: l.name,
     author,
     cover: l.cover,
+    boxImage: l.boxImage,
     token: l.token,
     figure: l.figure,
     tiles: l.tiles,
@@ -156,20 +163,19 @@ function toData(l: Loaded, author: string | null): PackData {
   };
 }
 
-function downloadJson(data: PackData, fileName: string) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+function fileSafe(name: string) {
+  return (name || "pack").replace(/[\\/:*?"<>|]/g, "_").trim() || "pack";
+}
+
+function saveBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `${fileName || "pack"}.fate-pack.json`;
+  link.download = fileName;
   document.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
-}
-
-function fileSafe(name: string) {
-  return (name || "pack").replace(/[\\/:*?"<>|]/g, "_").trim() || "pack";
 }
 
 // ---- small pieces
@@ -392,19 +398,11 @@ const PacksPage = () => {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const raw = JSON.parse(String(reader.result));
-        // a pack saved from this site
-        if (raw && typeof raw === "object" && (raw as { format?: string }).format === "fate-pack") {
-          setLoaded(fromData(raw as PackData, true));
-          setEditingId(null);
-          setMessage("Пак из файла открыт как новый. Чтобы он появился в облаке, сохраните его.");
-          return;
-        }
-        const parsed = parseTts(raw);
+        const parsed = parseTts(JSON.parse(String(reader.result)));
         if (!parsed) {
           setLoaded(null);
           setEditingId(null);
-          setMessage("В файле не нашлось коробки. Нужен .json из папки Documents\\My Games\\Tabletop Simulator\\Saves.");
+          setMessage("В файле не нашлось коробки. Нужен файл Tabletop Simulator (.json) из папки Documents\\My Games\\Tabletop Simulator\\Saves.");
           return;
         }
         setLoaded(fromParsed(parsed));
@@ -529,32 +527,37 @@ const PacksPage = () => {
 
   // ---- saving, publishing, removing
 
-  const download = () => {
-    if (!loaded) return;
-    downloadJson(toData(loaded, nickname.trim() || loaded.author), loaded.name);
-  };
-
-  // a file that Tabletop Simulator can spawn: put it into Saves\\Saved Objects
-  const downloadTts = (data: PackData) => {
+  // a file that Tabletop Simulator can spawn, with the picture for the list of saved objects
+  const downloadTts = async (data: PackData) => {
     const notLinks = countNonLinkImages(data);
     if (notLinks > 0) {
       setMessage(
-        `Для Tabletop нельзя: ${notLinks} картинок загружены файлом, а игра берёт картинки только по ссылке. Замените их ссылками и скачайте снова.`,
+        `Для Tabletop нельзя: ${notLinks} картинок загружены файлом или заданы не ссылкой, а игра берёт картинки только по ссылке. Замените их ссылками и скачайте снова.`,
       );
       return;
     }
-    const blob = new Blob([JSON.stringify(toTts(data), null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${fileSafe(data.name)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setMessage(
-      "Файл для Tabletop скачан. Положите его в Documents\\My Games\\Tabletop Simulator\\Saves\\Saved Objects и найдите в игре в Objects → Saved.",
-    );
+    const fileName = fileSafe(data.name);
+    const json = new TextEncoder().encode(JSON.stringify(toTts(data), null, 2));
+    // the front picture of the box is the picture of the pack
+    const png = await makeThumbnail(data.cover ?? null);
+    const noTexture = data.boxImage ? "" : " Текстура коробки не задана, поэтому в игре коробка будет белой.";
+    if (png) {
+      saveBlob(
+        makeZip([
+          { name: `${fileName}.json`, data: json },
+          { name: `${fileName}.png`, data: png },
+        ]),
+        `${fileName}.zip`,
+      );
+      setMessage(
+        `Скачан архив ${fileName}.zip. Распакуйте оба файла (.json и .png) в Documents\\My Games\\Tabletop Simulator\\Saves\\Saved Objects: картинка станет иконкой в списке.${noTexture}`,
+      );
+    } else {
+      saveBlob(new Blob([json as BlobPart], { type: "application/json" }), `${fileName}.json`);
+      setMessage(
+        `Скачан файл ${fileName}.json. Положите его в Documents\\My Games\\Tabletop Simulator\\Saves\\Saved Objects. Иконки не будет: у пака нет «Картинки пака».${noTexture}`,
+      );
+    }
   };
 
   // returns the text of the first problem, or null when the pack can be saved
@@ -563,6 +566,7 @@ const PacksPage = () => {
     if (!nickname.trim()) return "Введите ник: так вас увидят в общем списке.";
     if (l.token && !isImageSrc(l.token)) return "Ссылка на жетон должна начинаться с http:// или https://";
     if (l.figure && !isImageSrc(l.figure)) return "Ссылка на фигурку должна начинаться с http:// или https://";
+    if (l.boxImage && !isImageSrc(l.boxImage)) return "Ссылка на текстуру коробки должна начинаться с http:// или https://";
     const size = new Blob([JSON.stringify(toData(l, nickname.trim()))]).size;
     if (size > MAX_PACK_BYTES) {
       return `Пак слишком тяжёлый (${(size / 1_000_000).toFixed(1)} МБ, максимум ${MAX_PACK_BYTES / 1_000_000} МБ). Используйте ссылки вместо загруженных файлов.`;
@@ -682,8 +686,7 @@ const PacksPage = () => {
         ) : (
           <button className={buttonClass} onClick={() => openCopy(pack)}>Открыть</button>
         )}
-        <button className={buttonClass} onClick={() => downloadTts(pack.data)}>Для Tabletop</button>
-        <button className={buttonClass} onClick={() => downloadJson(pack.data, pack.data.name)}>Файл сайта</button>
+        <button className={buttonClass} onClick={() => downloadTts(pack.data)}>Скачать для Tabletop</button>
         {isOwner(pack) && (
           <button className={dangerClass} onClick={() => removePack(pack)}>Удалить</button>
         )}
@@ -724,7 +727,6 @@ const PacksPage = () => {
               >
                 Скачать для Tabletop
               </button>
-              <button className={buttonClass} onClick={download}>Файл сайта</button>
               {email ? (
                 <>
                   {editingId && (
@@ -743,7 +745,7 @@ const PacksPage = () => {
             </>
           )}
           <button className={buttonClass} onClick={createNew}>Создать пак</button>
-          <button className={buttonClass} onClick={() => fileInput.current?.click()}>Загрузить пак</button>
+          <button className={buttonClass} onClick={() => fileInput.current?.click()}>Загрузить пак из Tabletop</button>
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={importFile} className="hidden" />
         </div>
       </div>
@@ -752,7 +754,7 @@ const PacksPage = () => {
 
       {!loaded && (
         <p className="italic text-gray-400">
-          Нажмите «Создать пак», чтобы собрать пак прямо на сайте, или загрузите .json из папки{" "}
+          Нажмите «Создать пак», чтобы собрать пак прямо на сайте, или загрузите файл Tabletop (.json) из папки{" "}
           <b>Documents\My Games\Tabletop Simulator\Saves</b> (объекты из Saved Objects лежат в подпапке). Свои паки
           можно в любой момент открыть из списка ниже и поправить.
         </p>
@@ -770,7 +772,7 @@ const PacksPage = () => {
                 </div>
               )}
               <button className={buttonClass} onClick={() => coverInput.current?.click()}>
-                Картинка пака
+                Картинка пака (перед коробки)
               </button>
               {loaded.cover && (
                 <button className={dangerClass} onClick={() => update((l) => ({ ...l, cover: null }))}>
@@ -806,6 +808,15 @@ const PacksPage = () => {
                   maxLength={30}
                   placeholder="Например, Jipice"
                   onChange={(e) => changeNickname(e.target.value)}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="field-header">Текстура коробки для игры (ссылка)</span>
+                <input
+                  type="text"
+                  value={loaded.boxImage ?? ""}
+                  placeholder="https://... (картинка со страницы «Коробка мастера»)"
+                  onChange={(e) => update((l) => ({ ...l, boxImage: e.target.value.trim() || null }))}
                 />
               </label>
               <label className="flex items-center gap-2">

@@ -10,6 +10,7 @@ type TtsObject = {
   Name?: string;
   Nickname?: string;
   CustomImage?: { ImageURL?: string };
+  CustomMesh?: { DiffuseURL?: string };
   CustomDeck?: Record<string, TtsCustomDeck>;
   ContainedObjects?: TtsObject[];
 };
@@ -20,6 +21,7 @@ export type Pack = {
   name: string;
   token: string | null;
   figure: string | null;
+  boxImage: string | null;
   decks: PackDeck[];
   singles: PackCard[];
   tiles: { name: string; image: string }[];
@@ -62,6 +64,7 @@ export function parseTts(data: unknown): Pack | null {
     name: box.Nickname || save.SaveName || "Без названия",
     token: null,
     figure: null,
+    boxImage: isHttp(box.CustomMesh?.DiffuseURL) ? box.CustomMesh.DiffuseURL : null,
     decks: [],
     singles: [],
     tiles: [],
