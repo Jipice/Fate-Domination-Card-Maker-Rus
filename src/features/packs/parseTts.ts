@@ -9,7 +9,8 @@ type TtsCustomDeck = {
 type TtsObject = {
   Name?: string;
   Nickname?: string;
-  CustomImage?: { ImageURL?: string };
+  CustomImage?: { ImageURL?: string; ImageSecondaryURL?: string; ImageScalar?: number };
+  ColorDiffuse?: { r?: number; g?: number; b?: number };
   CustomMesh?: { DiffuseURL?: string };
   CustomDeck?: Record<string, TtsCustomDeck>;
   ContainedObjects?: TtsObject[];
@@ -21,12 +22,20 @@ export type Pack = {
   name: string;
   token: string | null;
   figure: string | null;
+  figureBack: string | null;
+  figureBase: string | null;
+  figureScale: number | null;
   boxImage: string | null;
   decks: PackDeck[];
   singles: PackCard[];
   tiles: { name: string; image: string }[];
   cardCount: number;
 };
+
+const toHex = (v: number | undefined) =>
+  Math.round(Math.min(1, Math.max(0, v ?? 1)) * 255)
+    .toString(16)
+    .padStart(2, "0");
 
 const isHttp = (url: unknown): url is string =>
   typeof url === "string" && /^https?:\/\//.test(url);
@@ -64,6 +73,9 @@ export function parseTts(data: unknown): Pack | null {
     name: box.Nickname || save.SaveName || "Без названия",
     token: null,
     figure: null,
+    figureBack: null,
+    figureBase: null,
+    figureScale: null,
     boxImage: isHttp(box.CustomMesh?.DiffuseURL) ? box.CustomMesh.DiffuseURL : null,
     decks: [],
     singles: [],
@@ -89,7 +101,17 @@ export function parseTts(data: unknown): Pack | null {
         if (!pack.token && isHttp(obj.CustomImage?.ImageURL)) pack.token = obj.CustomImage.ImageURL;
         break;
       case "Figurine_Custom":
-        if (!pack.figure && isHttp(obj.CustomImage?.ImageURL)) pack.figure = obj.CustomImage.ImageURL;
+        if (!pack.figure && isHttp(obj.CustomImage?.ImageURL)) {
+          pack.figure = obj.CustomImage.ImageURL;
+          const back = obj.CustomImage.ImageSecondaryURL;
+          pack.figureBack = isHttp(back) && back !== pack.figure ? back : null;
+          if (typeof obj.CustomImage.ImageScalar === "number" && obj.CustomImage.ImageScalar > 0) {
+            pack.figureScale = obj.CustomImage.ImageScalar;
+          }
+          if (obj.ColorDiffuse) {
+            pack.figureBase = `#${toHex(obj.ColorDiffuse.r)}${toHex(obj.ColorDiffuse.g)}${toHex(obj.ColorDiffuse.b)}`;
+          }
+        }
         break;
       case "Custom_Tile":
         if (isHttp(obj.CustomImage?.ImageURL)) {

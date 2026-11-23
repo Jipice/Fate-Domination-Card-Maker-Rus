@@ -17,9 +17,28 @@ export type PackLike = {
   boxImage?: string | null;
   token: string | null;
   figure: string | null;
+  figureBack?: string | null; // the back side of the figure (the front picture is used if empty)
+  figureBase?: string | null; // colour of the figure's base, "#rrggbb"
+  figureScale?: number | null; // size of the picture on the base
+  defaultBack?: string | null; // back for the cards that have no back of their own
   tiles: { name: string; image: string }[];
   categories: { title: string; cards: { name: string; face: string; back: string | null }[] }[];
 };
+
+// The game multiplies pictures by this colour. The old grey 0.713 made everything darker than the original,
+// so pure white (no tint) is used instead.
+const WHITE = { r: 1, g: 1, b: 1 };
+
+export const DEFAULT_FIGURE_BASE = "#ffffff";
+export const DEFAULT_FIGURE_SCALE = 1.8;
+
+export function hexToColor(hex: string | null | undefined): { r: number; g: number; b: number } {
+  const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? "").trim());
+  if (!m) return WHITE;
+  const n = parseInt(m[1], 16);
+  const round = (v: number) => Math.round((v / 255) * 1e6) / 1e6;
+  return { r: round((n >> 16) & 255), g: round((n >> 8) & 255), b: round(n & 255) };
+}
 
 type Json = Record<string, unknown>;
 
@@ -28,7 +47,13 @@ const isLink = (value: string | null | undefined): value is string =>
 
 // how many pictures of the pack are not links (they would be blank in the game)
 export function countNonLinkImages(pack: PackLike): number {
-  const all: (string | null)[] = [pack.token, pack.figure, pack.boxImage ?? null];
+  const all: (string | null)[] = [
+    pack.token,
+    pack.figure,
+    pack.figureBack ?? null,
+    pack.defaultBack ?? null,
+    pack.boxImage ?? null,
+  ];
   for (const tile of pack.tiles) all.push(tile.image);
   for (const cat of pack.categories) {
     for (const card of cat.cards) all.push(card.face, card.back);
@@ -49,14 +74,21 @@ export function toTts(pack: PackLike): Json {
     return g;
   };
 
-  const base = (name: string, nickname: string, rotZ = 0, scale = 1, scaleY = scale): Json => ({
+  const base = (
+    name: string,
+    nickname: string,
+    rotZ = 0,
+    scale = 1,
+    scaleY = scale,
+    color: { r: number; g: number; b: number } = WHITE,
+  ): Json => ({
     GUID: guid(),
     Name: name,
     Transform: { posX: 0, posY: 1, posZ: 0, rotX: 0, rotY: 180, rotZ, scaleX: scale, scaleY, scaleZ: scale },
     Nickname: nickname,
     Description: "",
     GMNotes: "",
-    ColorDiffuse: { r: 0.713235259, g: 0.713235259, b: 0.713235259 },
+    ColorDiffuse: color,
     Locked: false,
     Grid: true,
     Snap: true,
@@ -74,8 +106,8 @@ export function toTts(pack: PackLike): Json {
     XmlUI: "",
   });
 
-  // a card without its own back gets the first back found in the pack
-  let fallbackBack: string | null = null;
+  // a card without its own back gets the pack's default back, or else the first back found in the pack
+  let fallbackBack: string | null = isLink(pack.defaultBack) ? pack.defaultBack : null;
   for (const cat of pack.categories) {
     for (const card of cat.cards) {
       if (!fallbackBack && isLink(card.back)) fallbackBack = card.back;
@@ -151,11 +183,12 @@ export function toTts(pack: PackLike): Json {
 
   if (isLink(pack.figure)) {
     contained.push({
-      ...base("Figurine_Custom", "Фигурка"),
+      // the colour of a figure is the colour of its base
+      ...base("Figurine_Custom", "Фигурка", 0, 1, 1, hexToColor(pack.figureBase ?? DEFAULT_FIGURE_BASE)),
       CustomImage: {
         ImageURL: pack.figure,
-        ImageSecondaryURL: pack.figure,
-        ImageScalar: 1.0,
+        ImageSecondaryURL: isLink(pack.figureBack) ? pack.figureBack : pack.figure,
+        ImageScalar: pack.figureScale ?? DEFAULT_FIGURE_SCALE,
         WidthScale: 0.0,
         CustomToken: { Thickness: 0.2, MergeDistancePixels: 15.0, StandUp: false, Stackable: false },
       },
