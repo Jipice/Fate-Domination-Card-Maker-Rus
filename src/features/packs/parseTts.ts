@@ -22,20 +22,15 @@ export type Pack = {
   name: string;
   token: string | null;
   figure: string | null;
-  figureBack: string | null;
-  figureBase: string | null;
-  figureScale: number | null;
+  figureBack: string | null; // back side of the figure, if it differs from the front
+  figureBase: string | null; // colour of the figure's base, "#rrggbb"
+  figureScale: number | null; // size of the picture on the base
   boxImage: string | null;
   decks: PackDeck[];
   singles: PackCard[];
   tiles: { name: string; image: string }[];
   cardCount: number;
 };
-
-const toHex = (v: number | undefined) =>
-  Math.round(Math.min(1, Math.max(0, v ?? 1)) * 255)
-    .toString(16)
-    .padStart(2, "0");
 
 const isHttp = (url: unknown): url is string =>
   typeof url === "string" && /^https?:\/\//.test(url);
@@ -103,13 +98,14 @@ export function parseTts(data: unknown): Pack | null {
       case "Figurine_Custom":
         if (!pack.figure && isHttp(obj.CustomImage?.ImageURL)) {
           pack.figure = obj.CustomImage.ImageURL;
-          const back = obj.CustomImage.ImageSecondaryURL;
-          pack.figureBack = isHttp(back) && back !== pack.figure ? back : null;
-          if (typeof obj.CustomImage.ImageScalar === "number" && obj.CustomImage.ImageScalar > 0) {
-            pack.figureScale = obj.CustomImage.ImageScalar;
-          }
-          if (obj.ColorDiffuse) {
-            pack.figureBase = `#${toHex(obj.ColorDiffuse.r)}${toHex(obj.ColorDiffuse.g)}${toHex(obj.ColorDiffuse.b)}`;
+          const secondary = obj.CustomImage?.ImageSecondaryURL;
+          pack.figureBack = isHttp(secondary) && secondary !== pack.figure ? secondary : null;
+          const scale = obj.CustomImage?.ImageScalar;
+          pack.figureScale = typeof scale === "number" ? scale : null;
+          const c = obj.ColorDiffuse;
+          if (c && typeof c.r === "number" && typeof c.g === "number" && typeof c.b === "number") {
+            const hex = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0");
+            pack.figureBase = `#${hex(c.r)}${hex(c.g)}${hex(c.b)}`;
           }
         }
         break;
