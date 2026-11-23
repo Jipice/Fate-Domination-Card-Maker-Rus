@@ -92,6 +92,7 @@ export const SaveToLibraryButton = ({
   name,
   getForm,
   libraryId = null,
+  variant = "big",
 }: SaveProps) => {
   const [id, setId] = useState<string | null>(libraryId);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
@@ -100,6 +101,24 @@ export const SaveToLibraryButton = ({
 
   useEffect(() => {
     setId(libraryId);
+  }, [libraryId]);
+
+  // A card that was imported without a picture gets one the first time it is opened in the editor.
+  // Only the big button does this, so a page with two buttons does it once.
+  useEffect(() => {
+    if (!libraryId || variant === "small") return;
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      const record = await getCard(libraryId);
+      if (!record || record.thumbnail || cancelled) return;
+      const thumbnail = await makeThumbnail(captureId);
+      if (thumbnail && !cancelled) await putCard({ ...record, thumbnail });
+    }, 1200); // give the editor time to draw the loaded form
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [libraryId]);
 
   const save = async () => {
