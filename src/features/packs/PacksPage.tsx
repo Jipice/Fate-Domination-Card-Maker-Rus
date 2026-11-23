@@ -47,6 +47,7 @@ type Loaded = {
   tiles: Tile[];
   categories: Category[];
   isPublic: boolean;
+  readOnly?: boolean; // opened from the shared list by someone else: view and download only
 };
 
 type CloudPack = {
@@ -547,9 +548,9 @@ const PacksPage = () => {
 
   // someone else's pack: view it, or take a copy that belongs to you
   const openCopy = (pack: CloudPack) => {
-    setLoaded(fromData(pack.data, true));
+    setLoaded({ ...fromData(pack.data, true), readOnly: true });
     setEditingId(null);
-    setMessage(`Открыт пак «${pack.data.name}». Это копия: оригинал изменить нельзя, а копию можно скачать или сохранить как свой пак.`);
+    setMessage(`Открыт пак «${pack.data.name}» только для просмотра. Скачать его можно кнопкой «Скачать для Tabletop».`);
   };
 
   // your own pack: edit it in place
@@ -935,7 +936,7 @@ const PacksPage = () => {
               >
                 Скачать для Tabletop
               </button>
-              {email ? (
+              {loaded.readOnly ? null : email ? (
                 <>
                   {editingId && (
                     <button className={buttonClass} onClick={saveChanges} disabled={busy}>
@@ -952,8 +953,12 @@ const PacksPage = () => {
               <button className={dangerClass} onClick={closePack}>Закрыть</button>
             </>
           )}
-          <button className={buttonClass} onClick={createNew}>Создать пак</button>
-          <button className={buttonClass} onClick={() => fileInput.current?.click()}>Загрузить пак из Tabletop</button>
+          {!loaded?.readOnly && (
+            <>
+              <button className={buttonClass} onClick={createNew}>Создать пак</button>
+              <button className={buttonClass} onClick={() => fileInput.current?.click()}>Загрузить пак из Tabletop</button>
+            </>
+          )}
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={importFile} className="hidden" />
         </div>
       </div>
@@ -969,7 +974,7 @@ const PacksPage = () => {
       )}
 
       {loaded && (
-        <>
+        <fieldset disabled={!!loaded.readOnly} className="contents">
           <div className="flex flex-wrap gap-4 border border-black rounded p-3 bg-primary-dark-blue">
             <div className="flex flex-col gap-2 items-start">
               {loaded.cover ? (
@@ -1246,7 +1251,7 @@ const PacksPage = () => {
               </div>
             ))}
           </section>
-        </>
+        </fieldset>
       )}
 
       {email && (
