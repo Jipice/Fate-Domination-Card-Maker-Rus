@@ -8,10 +8,8 @@ import {
   FaFolder,
   FaFolderPlus,
 } from "react-icons/fa";
+import type { CardRecord, FolderRecord, PageKey } from "./db";
 import {
-  CardRecord,
-  FolderRecord,
-  PageKey,
   deleteCard,
   deleteFolder,
   listCards,
@@ -20,7 +18,9 @@ import {
   moveFolder,
   putCard,
   putFolder,
-} from "./db";
+  accountEmail,
+} from "./storage";
+import { supabase } from "../cloud/supabase";
 import { PAGE_INFO } from "./library";
 
 type Selection = "all" | "none" | string; // string = folder id
@@ -133,13 +133,21 @@ const LibraryPage = () => {
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const [account, setAccount] = useState<string | null>(null);
+
   const reload = async () => {
     setCards(await listCards());
     setFolders(await listFolders());
+    setAccount(await accountEmail());
   };
 
   useEffect(() => {
     reload();
+    // reload when the user signs in or out
+    const { data } = supabase.auth.onAuthStateChange(() => {
+      reload();
+    });
+    return () => data.subscription.unsubscribe();
   }, []);
 
   const children = useMemo(() => childrenMap(folders), [folders]);
@@ -371,6 +379,13 @@ const LibraryPage = () => {
         />
       </div>
 
+      <p className="text-sm">
+        {account ? (
+          <>Карты в аккаунте <b>{account}</b>. Они доступны с любого устройства.</>
+        ) : (
+          <>Карты сохранены в этом браузере. <Link href="/account" className="underline text-blue-300">Войдите</Link>, чтобы хранить их в аккаунте.</>
+        )}
+      </p>
       {message && <p className="italic">{message}</p>}
 
       <div className="flex flex-col md:flex-row gap-4 items-start">

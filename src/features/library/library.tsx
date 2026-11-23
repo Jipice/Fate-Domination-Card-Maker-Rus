@@ -3,7 +3,8 @@
 import { FaSave } from "react-icons/fa";
 import { snapdom } from "@zumer/snapdom";
 import { useEffect, useState } from "react";
-import { CardRecord, PageKey, getCard, putCard } from "./db";
+import type { CardRecord, PageKey } from "./db";
+import { getCard, putCard } from "./storage";
 
 export type { PageKey, CardRecord } from "./db";
 

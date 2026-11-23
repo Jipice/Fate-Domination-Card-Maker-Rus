@@ -12,6 +12,7 @@
   },
   "homepage": "https://fuugarlu.github.io/fate-domination-card-maker",
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "@tiptap/extension-bold": "^3.26.0",
     "@tiptap/extension-document": "^3.26.0",
     "@tiptap/extension-emoji": "^3.26.0",
