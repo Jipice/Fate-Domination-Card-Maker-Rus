@@ -118,10 +118,27 @@ const LibraryPage = () => {
   const [message, setMessage] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const [loaded, setLoaded] = useState(false);
+  const requestId = useRef(0);
+
+  // Sign-in state first (it is local and fast), then cards and folders together.
+  // A newer reload makes older answers be ignored.
   const reload = async () => {
-    setCards(await listCards());
-    setFolders(await listFolders());
-    setAccount(await accountEmail());
+    const id = ++requestId.current;
+    try {
+      const email = await accountEmail();
+      if (id !== requestId.current) return;
+      setAccount(email);
+      const [list, fl] = await Promise.all([listCards(), listFolders()]);
+      if (id !== requestId.current) return;
+      setCards(list);
+      setFolders(fl);
+      setLoaded(true);
+    } catch (err) {
+      if (id !== requestId.current) return;
+      setLoaded(true);
+      setMessage(err instanceof Error ? `Не удалось загрузить библиотеку: ${err.message}` : "Не удалось загрузить библиотеку");
+    }
   };
 
   useEffect(() => {
@@ -412,7 +429,8 @@ const LibraryPage = () => {
             </div>
           </div>
         ))}
-        {subfolders.length === 0 && visible.length === 0 && (
+        {!loaded && <p className="italic text-gray-400">Загружаем карты…</p>}
+        {loaded && subfolders.length === 0 && visible.length === 0 && (
           <p className="italic text-gray-400">
             Здесь пусто. Создайте папку сверху или перетащите сюда карты из другой папки.
           </p>
