@@ -73,7 +73,7 @@ export function parseTts(data: unknown): Pack | null {
       case "Deck": {
         const cards = collectCards([obj]);
         if (cards.length) {
-          pack.decks.push({ title: `Колода ${pack.decks.length + 1}`, cards });
+          pack.decks.push({ title: obj.Nickname || `Колода ${pack.decks.length + 1}`, cards });
         }
         break;
       }

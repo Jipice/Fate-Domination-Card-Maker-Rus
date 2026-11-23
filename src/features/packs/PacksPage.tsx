@@ -4,6 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../cloud/supabase";
 import { Pack, parseTts } from "./parseTts";
+import { countNonLinkImages, toTts } from "./toTts";
 
 // ---- data shapes
 
@@ -165,6 +166,10 @@ function downloadJson(data: PackData, fileName: string) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function fileSafe(name: string) {
+  return (name || "pack").replace(/[\\/:*?"<>|]/g, "_").trim() || "pack";
 }
 
 // ---- small pieces
@@ -529,6 +534,29 @@ const PacksPage = () => {
     downloadJson(toData(loaded, nickname.trim() || loaded.author), loaded.name);
   };
 
+  // a file that Tabletop Simulator can spawn: put it into Saves\\Saved Objects
+  const downloadTts = (data: PackData) => {
+    const notLinks = countNonLinkImages(data);
+    if (notLinks > 0) {
+      setMessage(
+        `Для Tabletop нельзя: ${notLinks} картинок загружены файлом, а игра берёт картинки только по ссылке. Замените их ссылками и скачайте снова.`,
+      );
+      return;
+    }
+    const blob = new Blob([JSON.stringify(toTts(data), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileSafe(data.name)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setMessage(
+      "Файл для Tabletop скачан. Положите его в Documents\\My Games\\Tabletop Simulator\\Saves\\Saved Objects и найдите в игре в Objects → Saved.",
+    );
+  };
+
   // returns the text of the first problem, or null when the pack can be saved
   const problemWithPack = (l: Loaded): string | null => {
     if (!email || !userId) return "Сначала войдите в аккаунт.";
@@ -654,7 +682,8 @@ const PacksPage = () => {
         ) : (
           <button className={buttonClass} onClick={() => openCopy(pack)}>Открыть</button>
         )}
-        <button className={buttonClass} onClick={() => downloadJson(pack.data, pack.data.name)}>Скачать</button>
+        <button className={buttonClass} onClick={() => downloadTts(pack.data)}>Для Tabletop</button>
+        <button className={buttonClass} onClick={() => downloadJson(pack.data, pack.data.name)}>Файл сайта</button>
         {isOwner(pack) && (
           <button className={dangerClass} onClick={() => removePack(pack)}>Удалить</button>
         )}
@@ -689,7 +718,13 @@ const PacksPage = () => {
         <div className="flex flex-wrap gap-2">
           {loaded && (
             <>
-              <button className={buttonClass} onClick={download}>Скачать файл</button>
+              <button
+                className={buttonClass}
+                onClick={() => downloadTts(toData(loaded, nickname.trim() || loaded.author))}
+              >
+                Скачать для Tabletop
+              </button>
+              <button className={buttonClass} onClick={download}>Файл сайта</button>
               {email ? (
                 <>
                   {editingId && (
