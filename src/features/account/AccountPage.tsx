@@ -4,7 +4,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "../cloud/supabase";
 import { copyLocalToCloud } from "../cloud/cloud";
 
-const buttonClass = "import-export-button bg-blue-500 hover:bg-blue-400 justify-center";
+const buttonClass = "w-full rounded px-4 py-2 text-white text-center bg-blue-500 hover:bg-blue-400";
+const grayButton = "w-full rounded px-4 py-2 text-white text-center bg-gray-700 hover:bg-red-800";
+const tabButton = (active: boolean) =>
+  `w-full rounded px-4 py-2 text-white text-center ${active ? "bg-blue-500 hover:bg-blue-400" : "bg-gray-700 hover:bg-gray-600"}`;
 
 const AccountPage = () => {
   const [email, setEmail] = useState("");
@@ -77,7 +80,7 @@ const AccountPage = () => {
           <button className={buttonClass} onClick={moveLocal} disabled={busy}>
             Перенести библиотеку из браузера в аккаунт
           </button>
-          <button className="import-export-button bg-gray-700 hover:bg-red-800" onClick={signOut}>
+          <button className={grayButton} onClick={signOut}>
             Выйти
           </button>
         </div>
@@ -91,13 +94,13 @@ const AccountPage = () => {
       <h1 className="text-xl font-semibold">Аккаунт</h1>
       <div className="flex gap-2">
         <button
-          className={mode === "login" ? buttonClass : "import-export-button bg-gray-700 hover:bg-gray-600"}
+          className={tabButton(mode === "login")}
           onClick={() => setMode("login")}
         >
           Войти
         </button>
         <button
-          className={mode === "register" ? buttonClass : "import-export-button bg-gray-700 hover:bg-gray-600"}
+          className={tabButton(mode === "register")}
           onClick={() => setMode("register")}
         >
           Регистрация

@@ -142,3 +142,10 @@ input::-webkit-inner-spin-button {
   backdrop-filter: blur(6px);
   border-color: #e8c46e;
 }
+
+/* Furina theme: dark panel behind the page content so text stays readable over the artwork */
+[data-theme="furina"] main {
+  background: rgba(6, 12, 34, 0.78);
+  border-radius: 12px;
+  padding: 16px;
+}

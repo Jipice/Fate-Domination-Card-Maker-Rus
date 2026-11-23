@@ -30,7 +30,7 @@ const PacksPage = () => {
         const parsed = parseTts(JSON.parse(String(reader.result)));
         if (!parsed) {
           setPack(null);
-          setMessage("В файле не нашлось коробки. Нужен .json из Saved Objects Tabletop Simulator.");
+          setMessage("В файле не нашлось коробки. Нужен .json из папки Documents\My Games\Tabletop Simulator\Saves.");
           return;
         }
         setPack(parsed);
@@ -64,7 +64,9 @@ const PacksPage = () => {
 
       {!pack && !message && (
         <p className="italic text-gray-400">
-          Загрузите файл .json из Saved Objects Tabletop Simulator, и сайт покажет коробку пака.
+          Загрузите файл .json из Tabletop Simulator. Он лежит в папке
+          Documents\My Games\Tabletop Simulator\Saves (сохранённые объекты — в подпапке Saved Objects).
+          Сайт покажет коробку пака.
         </p>
       )}
 
