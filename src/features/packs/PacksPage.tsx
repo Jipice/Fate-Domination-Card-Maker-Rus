@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "../cloud/supabase";
 import { Pack, parseTts } from "./parseTts";
@@ -32,17 +32,32 @@ type Loaded = {
   figure: string | null;
   tiles: Tile[];
   categories: Category[];
+  isPublic: boolean;
 };
 
-type PublicPack = { id: string; ownerId: string; data: PackData; createdAt: string };
+type CloudPack = {
+  id: string;
+  ownerId: string;
+  data: PackData;
+  isPublic: boolean;
+  createdAt: string;
+};
+
+type NewCard = { name: string; face: string; back: string | null };
 
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const buttonClass = "import-export-button bg-blue-500 hover:bg-blue-400 justify-center";
 const dangerClass = "import-export-button bg-gray-700 hover:bg-red-800 justify-center";
 
-// the picture that shows which character the pack is about; shrunk to keep the pack small
-function resizeImage(file: File, size = 256): Promise<string> {
+// a picture is either a web link or a small picture uploaded from the computer
+const isImageSrc = (value: string) => /^https?:\/\//.test(value) || /^data:image\//.test(value);
+
+// largest pack that will be sent to the cloud (uploaded pictures make it heavy)
+const MAX_PACK_BYTES = 4_000_000;
+
+// shrinks an uploaded picture so the pack stays small
+function resizeImage(file: File, size = 256, quality = 0.85): Promise<string> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -53,7 +68,7 @@ function resizeImage(file: File, size = 256): Promise<string> {
       canvas.height = Math.round(img.height * scale);
       canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/jpeg", 0.85));
+      resolve(canvas.toDataURL("image/jpeg", quality));
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -64,6 +79,19 @@ function resizeImage(file: File, size = 256): Promise<string> {
 }
 
 const totalCards = (l: Loaded) => l.categories.reduce((n, c) => n + c.cards.length, 0);
+
+function emptyPack(): Loaded {
+  return {
+    name: "Новый пак",
+    author: null,
+    cover: null,
+    token: null,
+    figure: null,
+    tiles: [],
+    categories: [{ id: uid(), title: "Карты", cards: [] }],
+    isPublic: true,
+  };
+}
 
 function fromParsed(p: Pack): Loaded {
   const categories: Category[] = p.decks.map((d) => ({
@@ -78,10 +106,26 @@ function fromParsed(p: Pack): Loaded {
       cards: p.singles.map((c) => ({ id: uid(), name: c.name, face: c.face, back: c.back })),
     });
   }
-  return { name: p.name, author: null, cover: null, token: p.token, figure: p.figure, tiles: p.tiles, categories };
+  if (!categories.length) categories.push({ id: uid(), title: "Карты", cards: [] });
+  return {
+    name: p.name,
+    author: null,
+    cover: null,
+    token: p.token,
+    figure: p.figure,
+    tiles: p.tiles,
+    categories,
+    isPublic: true,
+  };
 }
 
-function fromData(d: PackData): Loaded {
+function fromData(d: PackData, isPublic: boolean): Loaded {
+  const categories: Category[] = d.categories.map((c) => ({
+    id: uid(),
+    title: c.title,
+    cards: c.cards.map((card) => ({ id: uid(), ...card })),
+  }));
+  if (!categories.length) categories.push({ id: uid(), title: "Карты", cards: [] });
   return {
     name: d.name,
     author: d.author,
@@ -89,11 +133,8 @@ function fromData(d: PackData): Loaded {
     token: d.token,
     figure: d.figure,
     tiles: d.tiles,
-    categories: d.categories.map((c) => ({
-      id: uid(),
-      title: c.title,
-      cards: c.cards.map((card) => ({ id: uid(), ...card })),
-    })),
+    categories,
+    isPublic,
   };
 }
 
@@ -112,6 +153,18 @@ function toData(l: Loaded, author: string | null): PackData {
       cards: c.cards.map(({ name, face, back }) => ({ name, face, back })),
     })),
   };
+}
+
+function downloadJson(data: PackData, fileName: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${fileName || "pack"}.fate-pack.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ---- small pieces
@@ -138,40 +191,137 @@ const CardImage = ({
   />
 );
 
+// form under every category: add a card by a link or by uploading pictures
+const AddCardForm = ({ onAdd }: { onAdd: (card: NewCard) => void }) => {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [face, setFace] = useState("");
+  const [name, setName] = useState("");
+  const [back, setBack] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const add = () => {
+    const faceUrl = face.trim();
+    const backUrl = back.trim();
+    if (!isImageSrc(faceUrl)) {
+      setError("Вставьте ссылку на картинку карты (начинается с http:// или https://) или загрузите файл.");
+      return;
+    }
+    if (backUrl && !isImageSrc(backUrl)) {
+      setError("Ссылка на рубашку должна начинаться с http:// или https://");
+      return;
+    }
+    onAdd({ name: name.trim(), face: faceUrl, back: backUrl || null });
+    setFace("");
+    setName("");
+    setBack("");
+    setError(null);
+  };
+
+  const upload = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    try {
+      for (const file of Array.from(files)) {
+        const data = await resizeImage(file, 700, 0.85);
+        onAdd({ name: file.name.replace(/\.[^.]+$/, ""), face: data, back: null });
+      }
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось загрузить картинку");
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2 border-t border-black pt-2">
+      <span className="text-sm text-gray-400">Добавить карту</span>
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="text"
+          placeholder="Ссылка на картинку карты"
+          value={face}
+          onChange={(e) => setFace(e.target.value)}
+          className="flex-1 min-w-[14rem]"
+        />
+        <input
+          type="text"
+          placeholder="Название (необязательно)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="flex-1 min-w-[10rem]"
+        />
+        <input
+          type="text"
+          placeholder="Рубашка, ссылка (необязательно)"
+          value={back}
+          onChange={(e) => setBack(e.target.value)}
+          className="flex-1 min-w-[10rem]"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button className={buttonClass} onClick={add}>Добавить по ссылке</button>
+        <button className={buttonClass} onClick={() => fileRef.current?.click()}>Загрузить файлы</button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = e.target.files;
+            upload(files).finally(() => {
+              e.target.value = "";
+            });
+          }}
+        />
+        <span className="text-xs text-gray-500">
+          Ссылка легче: загруженные файлы сжимаются, но всё равно увеличивают размер пака.
+        </span>
+      </div>
+      {error && <p className="text-sm text-red-400">{error}</p>}
+    </div>
+  );
+};
+
 // ---- page
 
 const PacksPage = () => {
   const fileInput = useRef<HTMLInputElement>(null);
   const coverInput = useRef<HTMLInputElement>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  // id of the cloud pack that is being edited; null = a new pack that is not saved yet
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [publicPacks, setPublicPacks] = useState<PublicPack[]>([]);
+  const [packs, setPacks] = useState<CloudPack[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [nickname, setNickname] = useState("");
   const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
   const [scale, setScale] = useState(1);
+  const [tileName, setTileName] = useState("");
+  const [tileImage, setTileImage] = useState("");
 
-  const loadPublic = async () => {
-    const { data, error } = await supabase
+  // everything public, plus the signed-in person's own packs (including hidden ones)
+  const loadPacks = useCallback(async (me: string | null) => {
+    let query = supabase
       .from("packs")
-      .select("id,user_id,data,created_at")
-      .eq("is_public", true)
+      .select("id,user_id,data,is_public,created_at")
       .order("created_at", { ascending: false });
+    query = me ? query.or(`is_public.eq.true,user_id.eq.${me}`) : query.eq("is_public", true);
+    const { data, error } = await query;
     if (error) {
-      setMessage(`Не удалось загрузить общий список: ${error.message}`);
+      setMessage(`Не удалось загрузить список паков: ${error.message}`);
       return;
     }
-    setPublicPacks(
+    setPacks(
       (data ?? []).map((row) => ({
         id: row.id as string,
         ownerId: row.user_id as string,
         data: row.data as PackData,
+        isPublic: !!row.is_public,
         createdAt: row.created_at as string,
       })),
     );
-  };
+  }, []);
 
   useEffect(() => {
     const syncUser = async () => {
@@ -180,7 +330,6 @@ const PacksPage = () => {
       setUserId(data.session?.user.id ?? null);
     };
     syncUser();
-    loadPublic();
     try {
       setNickname(localStorage.getItem("pack-nickname") ?? "");
     } catch {
@@ -189,6 +338,11 @@ const PacksPage = () => {
     const { data } = supabase.auth.onAuthStateChange(() => syncUser());
     return () => data.subscription.unsubscribe();
   }, []);
+
+  // reload the list when the signed-in person changes, so their hidden packs appear
+  useEffect(() => {
+    loadPacks(userId);
+  }, [userId, loadPacks]);
 
   const changeNickname = (value: string) => {
     setNickname(value);
@@ -214,7 +368,17 @@ const PacksPage = () => {
     setZoom({ src, alt });
   };
 
-  // ---- loading a file
+  const isOwner = (pack: CloudPack) => !!userId && pack.ownerId === userId;
+  const myPacks = packs.filter(isOwner);
+  const publicPacks = packs.filter((p) => p.isPublic);
+
+  // ---- starting a pack
+
+  const createNew = () => {
+    setLoaded(emptyPack());
+    setEditingId(null);
+    setMessage("Новый пак. Добавляйте карты по ссылке или файлом, затем сохраните в облако.");
+  };
 
   const importFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -223,28 +387,54 @@ const PacksPage = () => {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = parseTts(JSON.parse(String(reader.result)));
+        const raw = JSON.parse(String(reader.result));
+        // a pack saved from this site
+        if (raw && typeof raw === "object" && (raw as { format?: string }).format === "fate-pack") {
+          setLoaded(fromData(raw as PackData, true));
+          setEditingId(null);
+          setMessage("Пак из файла открыт как новый. Чтобы он появился в облаке, сохраните его.");
+          return;
+        }
+        const parsed = parseTts(raw);
         if (!parsed) {
           setLoaded(null);
+          setEditingId(null);
           setMessage("В файле не нашлось коробки. Нужен .json из папки Documents\\My Games\\Tabletop Simulator\\Saves.");
           return;
         }
         setLoaded(fromParsed(parsed));
+        setEditingId(null);
         setMessage(null);
       } catch {
         setLoaded(null);
+        setEditingId(null);
         setMessage("Не удалось прочитать файл: это не JSON.");
       }
     };
     reader.readAsText(file);
   };
 
-  const openPublic = (pack: PublicPack) => {
-    setLoaded(fromData(pack.data));
-    setMessage(`Открыт пак «${pack.data.name}». Изменения сохраняются только если его скачать или опубликовать.`);
+  // someone else's pack: view it, or take a copy that belongs to you
+  const openCopy = (pack: CloudPack) => {
+    setLoaded(fromData(pack.data, true));
+    setEditingId(null);
+    setMessage(`Открыт пак «${pack.data.name}». Это копия: оригинал изменить нельзя, а копию можно скачать или сохранить как свой пак.`);
   };
 
-  // ---- editing categories
+  // your own pack: edit it in place
+  const openForEdit = (pack: CloudPack) => {
+    setLoaded(fromData(pack.data, pack.isPublic));
+    setEditingId(pack.id);
+    if (!nickname.trim() && pack.data.author) changeNickname(pack.data.author);
+    setMessage(`Редактирование пака «${pack.data.name}». Изменения попадут в облако после «Сохранить изменения».`);
+  };
+
+  const closePack = () => {
+    setLoaded(null);
+    setEditingId(null);
+  };
+
+  // ---- editing
 
   const update = (fn: (l: Loaded) => Loaded) => setLoaded((prev) => (prev ? fn(prev) : prev));
 
@@ -280,6 +470,29 @@ const PacksPage = () => {
       };
     });
 
+  const addCard = (catId: string, card: NewCard) =>
+    update((l) => ({
+      ...l,
+      categories: l.categories.map((c) =>
+        c.id === catId ? { ...c, cards: [...c.cards, { id: uid(), ...card }] } : c,
+      ),
+    }));
+
+  const removeCard = (cardId: string) =>
+    update((l) => ({
+      ...l,
+      categories: l.categories.map((c) => ({ ...c, cards: c.cards.filter((x) => x.id !== cardId) })),
+    }));
+
+  const renameCard = (cardId: string, name: string) =>
+    update((l) => ({
+      ...l,
+      categories: l.categories.map((c) => ({
+        ...c,
+        cards: c.cards.map((x) => (x.id === cardId ? { ...x, name } : x)),
+      })),
+    }));
+
   const moveCard = (cardId: string, toId: string) =>
     update((l) => {
       let moved: Item | undefined;
@@ -295,48 +508,159 @@ const PacksPage = () => {
       };
     });
 
+  const addTile = () => {
+    const image = tileImage.trim();
+    if (!isImageSrc(image)) {
+      setMessage("Для плитки нужна ссылка на картинку (начинается с http:// или https://).");
+      return;
+    }
+    update((l) => ({ ...l, tiles: [...l.tiles, { name: tileName.trim() || "Плитка", image }] }));
+    setTileName("");
+    setTileImage("");
+  };
+
+  const removeTile = (index: number) =>
+    update((l) => ({ ...l, tiles: l.tiles.filter((_, i) => i !== index) }));
+
   // ---- saving, publishing, removing
 
   const download = () => {
     if (!loaded) return;
-    const blob = new Blob([JSON.stringify(toData(loaded, nickname.trim() || loaded.author), null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${loaded.name || "pack"}.fate-pack.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    downloadJson(toData(loaded, nickname.trim() || loaded.author), loaded.name);
   };
 
-  const publish = async () => {
-    if (!loaded || !email) return;
-    if (!nickname.trim()) {
-      setMessage("Введите ник: так вас увидят в общем списке.");
+  // returns the text of the first problem, or null when the pack can be saved
+  const problemWithPack = (l: Loaded): string | null => {
+    if (!email || !userId) return "Сначала войдите в аккаунт.";
+    if (!nickname.trim()) return "Введите ник: так вас увидят в общем списке.";
+    if (l.token && !isImageSrc(l.token)) return "Ссылка на жетон должна начинаться с http:// или https://";
+    if (l.figure && !isImageSrc(l.figure)) return "Ссылка на фигурку должна начинаться с http:// или https://";
+    const size = new Blob([JSON.stringify(toData(l, nickname.trim()))]).size;
+    if (size > MAX_PACK_BYTES) {
+      return `Пак слишком тяжёлый (${(size / 1_000_000).toFixed(1)} МБ, максимум ${MAX_PACK_BYTES / 1_000_000} МБ). Используйте ссылки вместо загруженных файлов.`;
+    }
+    return null;
+  };
+
+  // saves the open pack as a NEW cloud pack that belongs to you
+  const saveAsNew = async () => {
+    if (!loaded) return;
+    const problem = problemWithPack(loaded);
+    if (problem) {
+      setMessage(problem);
       return;
     }
     setBusy(true);
-    const { error } = await supabase.from("packs").insert({
-      name: loaded.name || "Без названия",
-      data: toData(loaded, nickname.trim()),
-      is_public: true,
-    });
+    const { data, error } = await supabase
+      .from("packs")
+      .insert({
+        user_id: userId,
+        name: loaded.name || "Без названия",
+        data: toData(loaded, nickname.trim()),
+        is_public: loaded.isPublic,
+      })
+      .select("id")
+      .single();
     setBusy(false);
-    setMessage(error ? `Не удалось опубликовать: ${error.message}` : "Пак опубликован и виден всем.");
-    if (!error) loadPublic();
+    if (error || !data) {
+      setMessage(`Не удалось сохранить: ${error?.message ?? "нет ответа от сервера"}`);
+      return;
+    }
+    setEditingId(data.id as string);
+    setMessage(
+      loaded.isPublic
+        ? "Пак сохранён и виден всем. Дальше правьте его и жмите «Сохранить изменения»."
+        : "Пак сохранён и виден только вам. Дальше правьте его и жмите «Сохранить изменения».",
+    );
+    loadPacks(userId);
   };
 
-  const removePublic = async (pack: PublicPack) => {
-    if (!window.confirm(`Удалить «${pack.data.name}» из общего списка?`)) return;
-    const { error } = await supabase.from("packs").delete().eq("id", pack.id);
-    setMessage(error ? `Не удалось удалить: ${error.message}` : "Пак удалён из общего списка.");
-    if (!error) loadPublic();
+  // writes the changes into the pack that is being edited (only the owner is allowed to)
+  const saveChanges = async () => {
+    if (!loaded || !editingId) return;
+    const problem = problemWithPack(loaded);
+    if (problem) {
+      setMessage(problem);
+      return;
+    }
+    setBusy(true);
+    const { data, error } = await supabase
+      .from("packs")
+      .update({
+        name: loaded.name || "Без названия",
+        data: toData(loaded, nickname.trim()),
+        is_public: loaded.isPublic,
+      })
+      .eq("id", editingId)
+      .select("id");
+    setBusy(false);
+    if (error) {
+      setMessage(`Не удалось сохранить: ${error.message}`);
+      return;
+    }
+    // the database silently skips rows that are not yours, so an empty answer means "no access"
+    if (!data || data.length === 0) {
+      setMessage("Не удалось сохранить: этот пак не ваш или уже удалён.");
+      return;
+    }
+    setMessage("Изменения сохранены.");
+    loadPacks(userId);
   };
 
-  const isOwner = (pack: PublicPack) => !!userId && pack.ownerId === userId;
+  const removePack = async (pack: CloudPack) => {
+    if (!window.confirm(`Удалить пак «${pack.data.name}» навсегда?`)) return;
+    const { data, error } = await supabase.from("packs").delete().eq("id", pack.id).select("id");
+    if (error) {
+      setMessage(`Не удалось удалить: ${error.message}`);
+      return;
+    }
+    if (!data || data.length === 0) {
+      setMessage("Не удалось удалить: этот пак не ваш.");
+      return;
+    }
+    if (editingId === pack.id) closePack();
+    setMessage("Пак удалён.");
+    loadPacks(userId);
+  };
+
+  // ---- render helpers
+
+  const renderRow = (pack: CloudPack) => (
+    <div
+      key={pack.id}
+      className="flex flex-wrap items-center justify-between gap-3 border border-black rounded p-3 bg-primary-dark-blue"
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        {pack.data.cover ? (
+          <img src={pack.data.cover} alt="" className="w-16 h-16 object-cover rounded border border-black shrink-0" />
+        ) : (
+          <div className="w-16 h-16 rounded border border-dashed border-gray-500 shrink-0" />
+        )}
+        <div className="flex flex-col">
+          <span className="font-semibold">
+            {pack.data.name}
+            {!pack.isPublic && <span className="ml-2 text-xs text-gray-400">(виден только вам)</span>}
+          </span>
+          <span className="text-sm text-gray-400">
+            автор: {pack.data.author ?? "неизвестен"} · карт:{" "}
+            {pack.data.categories.reduce((n, c) => n + c.cards.length, 0)} · категорий:{" "}
+            {pack.data.categories.length}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {isOwner(pack) ? (
+          <button className={buttonClass} onClick={() => openForEdit(pack)}>Редактировать</button>
+        ) : (
+          <button className={buttonClass} onClick={() => openCopy(pack)}>Открыть</button>
+        )}
+        <button className={buttonClass} onClick={() => downloadJson(pack.data, pack.data.name)}>Скачать</button>
+        {isOwner(pack) && (
+          <button className={dangerClass} onClick={() => removePack(pack)}>Удалить</button>
+        )}
+      </div>
+    </div>
+  );
 
   // ---- render
 
@@ -359,6 +683,7 @@ const PacksPage = () => {
           </div>
         </div>
       )}
+
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">Паки</h1>
         <div className="flex flex-wrap gap-2">
@@ -366,13 +691,23 @@ const PacksPage = () => {
             <>
               <button className={buttonClass} onClick={download}>Скачать файл</button>
               {email ? (
-                <button className={buttonClass} onClick={publish} disabled={busy}>Опубликовать</button>
+                <>
+                  {editingId && (
+                    <button className={buttonClass} onClick={saveChanges} disabled={busy}>
+                      Сохранить изменения
+                    </button>
+                  )}
+                  <button className={buttonClass} onClick={saveAsNew} disabled={busy}>
+                    {editingId ? "Сохранить как новый" : "Сохранить в облако"}
+                  </button>
+                </>
               ) : (
-                <Link href="/account" className={buttonClass}>Войти, чтобы опубликовать</Link>
+                <Link href="/account" className={buttonClass}>Войти, чтобы сохранить</Link>
               )}
-              <button className={dangerClass} onClick={() => setLoaded(null)}>Закрыть</button>
+              <button className={dangerClass} onClick={closePack}>Закрыть</button>
             </>
           )}
+          <button className={buttonClass} onClick={createNew}>Создать пак</button>
           <button className={buttonClass} onClick={() => fileInput.current?.click()}>Загрузить пак</button>
           <input ref={fileInput} type="file" accept=".json,application/json" onChange={importFile} className="hidden" />
         </div>
@@ -382,8 +717,9 @@ const PacksPage = () => {
 
       {!loaded && (
         <p className="italic text-gray-400">
-          Загрузите .json из папки <b>Documents\My Games\Tabletop Simulator\Saves</b> (объекты из Saved Objects лежат
-          в подпапке). Сайт покажет коробку пака, и её можно будет поделить по категориям.
+          Нажмите «Создать пак», чтобы собрать пак прямо на сайте, или загрузите .json из папки{" "}
+          <b>Documents\My Games\Tabletop Simulator\Saves</b> (объекты из Saved Objects лежат в подпапке). Свои паки
+          можно в любой момент открыть из списка ниже и поправить.
         </p>
       )}
 
@@ -419,53 +755,105 @@ const PacksPage = () => {
               />
             </div>
             <div className="flex flex-col gap-2 flex-1 min-w-[16rem]">
-            <label className="flex flex-col gap-1">
-              <span className="field-header">Название пака</span>
-              <input
-                type="text"
-                value={loaded.name}
-                onChange={(e) => update((l) => ({ ...l, name: e.target.value }))}
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="field-header">Ник автора (виден в общем списке)</span>
-              <input
-                type="text"
-                value={nickname}
-                maxLength={30}
-                placeholder="Например, Jipice"
-                onChange={(e) => changeNickname(e.target.value)}
-              />
-            </label>
-            <span className="text-sm text-gray-400">
-              Карт: {totalCards(loaded)} · категорий: {loaded.categories.length} · плиток: {loaded.tiles.length}
-            </span>
+              <label className="flex flex-col gap-1">
+                <span className="field-header">Название пака</span>
+                <input
+                  type="text"
+                  value={loaded.name}
+                  onChange={(e) => update((l) => ({ ...l, name: e.target.value }))}
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="field-header">Ник автора (виден в общем списке)</span>
+                <input
+                  type="text"
+                  value={nickname}
+                  maxLength={30}
+                  placeholder="Например, Jipice"
+                  onChange={(e) => changeNickname(e.target.value)}
+                />
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={loaded.isPublic}
+                  onChange={(e) => update((l) => ({ ...l, isPublic: e.target.checked }))}
+                  style={{ width: "auto" }}
+                />
+                <span>Виден всем в общем списке (без галочки видите только вы)</span>
+              </label>
+              <span className="text-sm text-gray-400">
+                Карт: {totalCards(loaded)} · категорий: {loaded.categories.length} · плиток: {loaded.tiles.length}
+                {editingId && " · вы редактируете сохранённый пак"}
+              </span>
             </div>
           </div>
 
-          {(loaded.token || loaded.figure) && (
-            <section className="flex flex-col gap-2">
-              <h2 className="font-semibold">Жетон и фигурка</h2>
-              <div className="flex flex-wrap gap-4">
-                {loaded.token && <CardImage src={loaded.token} alt="Жетон" testId="token" onOpen={openZoom} />}
-                {loaded.figure && <CardImage src={loaded.figure} alt="Фигурка" testId="figure" onOpen={openZoom} />}
+          <section className="flex flex-col gap-2">
+            <h2 className="font-semibold">Жетон и фигурка</h2>
+            <div className="flex flex-wrap gap-4">
+              <div className="flex flex-col gap-2 flex-1 min-w-[14rem]">
+                <label className="flex flex-col gap-1">
+                  <span className="field-header">Жетон (ссылка на картинку)</span>
+                  <input
+                    type="text"
+                    value={loaded.token ?? ""}
+                    placeholder="https://..."
+                    onChange={(e) => update((l) => ({ ...l, token: e.target.value.trim() || null }))}
+                  />
+                </label>
+                {loaded.token && isImageSrc(loaded.token) && (
+                  <CardImage src={loaded.token} alt="Жетон" testId="token" onOpen={openZoom} />
+                )}
               </div>
-            </section>
-          )}
+              <div className="flex flex-col gap-2 flex-1 min-w-[14rem]">
+                <label className="flex flex-col gap-1">
+                  <span className="field-header">Фигурка (ссылка на картинку)</span>
+                  <input
+                    type="text"
+                    value={loaded.figure ?? ""}
+                    placeholder="https://..."
+                    onChange={(e) => update((l) => ({ ...l, figure: e.target.value.trim() || null }))}
+                  />
+                </label>
+                {loaded.figure && isImageSrc(loaded.figure) && (
+                  <CardImage src={loaded.figure} alt="Фигурка" testId="figure" onOpen={openZoom} />
+                )}
+              </div>
+            </div>
+          </section>
 
-          {loaded.tiles.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <h2 className="font-semibold">Плитки</h2>
+          <section className="flex flex-col gap-2">
+            <h2 className="font-semibold">Плитки</h2>
+            {loaded.tiles.length > 0 && (
               <div className="flex flex-wrap gap-4">
                 {loaded.tiles.map((tile, i) => (
                   <div key={i} className="flex flex-col gap-1 items-start">
                     <CardImage src={tile.image} alt={tile.name} testId="tile" onOpen={openZoom} />
                     <span className="text-xs text-gray-400">{tile.name}</span>
+                    <button className={dangerClass} onClick={() => removeTile(i)}>Убрать</button>
                   </div>
                 ))}
               </div>
-            </section>
-          )}
+            )}
+            <div className="flex flex-wrap gap-2 items-center">
+              <input
+                type="text"
+                placeholder="Ссылка на картинку плитки"
+                value={tileImage}
+                onChange={(e) => setTileImage(e.target.value)}
+                className="flex-1 min-w-[14rem]"
+              />
+              <input
+                type="text"
+                placeholder="Название (необязательно)"
+                value={tileName}
+                onChange={(e) => setTileName(e.target.value)}
+                className="flex-1 min-w-[10rem]"
+              />
+              <button className={buttonClass} onClick={addTile}>Добавить плитку</button>
+            </div>
+          </section>
 
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-2">
@@ -499,11 +887,15 @@ const PacksPage = () => {
                     <div key={card.id} className="flex flex-col gap-1 items-center w-28">
                       <CardImage src={card.face} alt={card.name || "Карта"} testId="card" onOpen={openZoom} />
                       {card.back && <CardImage src={card.back} alt="Рубашка" testId="back" onOpen={openZoom} />}
-                      {card.name && (
-                        <span className="text-xs text-gray-400 text-center truncate w-28" title={card.name}>
-                          {card.name}
-                        </span>
-                      )}
+                      <input
+                        type="text"
+                        aria-label="Название карты"
+                        placeholder="Название"
+                        value={card.name}
+                        onChange={(e) => renameCard(card.id, e.target.value)}
+                        className="text-xs"
+                        style={{ width: "7rem", height: "28px", padding: "0 4px" }}
+                      />
                       {loaded.categories.length > 1 && (
                         <select
                           aria-label="Переместить в категорию"
@@ -517,13 +909,32 @@ const PacksPage = () => {
                           ))}
                         </select>
                       )}
+                      <button
+                        className={dangerClass}
+                        onClick={() => removeCard(card.id)}
+                        style={{ width: "7rem" }}
+                      >
+                        Убрать
+                      </button>
                     </div>
                   ))}
                 </div>
+
+                <AddCardForm onAdd={(card) => addCard(cat.id, card)} />
               </div>
             ))}
           </section>
         </>
+      )}
+
+      {email && (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-semibold">Мои паки</h2>
+          {myPacks.length === 0 && (
+            <p className="italic text-gray-400">У вас пока нет сохранённых паков. Создайте новый или загрузите файл.</p>
+          )}
+          {myPacks.map(renderRow)}
+        </section>
       )}
 
       <section className="flex flex-col gap-3">
@@ -531,50 +942,7 @@ const PacksPage = () => {
         {publicPacks.length === 0 && (
           <p className="italic text-gray-400">Пока никто ничего не опубликовал.</p>
         )}
-        {publicPacks.map((pack) => (
-          <div
-            key={pack.id}
-            className="flex flex-wrap items-center justify-between gap-3 border border-black rounded p-3 bg-primary-dark-blue"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              {pack.data.cover ? (
-                <img src={pack.data.cover} alt="" className="w-16 h-16 object-cover rounded border border-black shrink-0" />
-              ) : (
-                <div className="w-16 h-16 rounded border border-dashed border-gray-500 shrink-0" />
-              )}
-            <div className="flex flex-col">
-              <span className="font-semibold">{pack.data.name}</span>
-              <span className="text-sm text-gray-400">
-                автор: {pack.data.author ?? "неизвестен"} · карт:{" "}
-                {pack.data.categories.reduce((n, c) => n + c.cards.length, 0)} · категорий:{" "}
-                {pack.data.categories.length}
-              </span>
-            </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button className={buttonClass} onClick={() => openPublic(pack)}>Открыть</button>
-              <button
-                className={buttonClass}
-                onClick={() => {
-                  const blob = new Blob([JSON.stringify(pack.data, null, 2)], { type: "application/json" });
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement("a");
-                  link.href = url;
-                  link.download = `${pack.data.name || "pack"}.fate-pack.json`;
-                  document.body.appendChild(link);
-                  link.click();
-                  link.remove();
-                  URL.revokeObjectURL(url);
-                }}
-              >
-                Скачать
-              </button>
-              {isOwner(pack) && (
-                <button className={dangerClass} onClick={() => removePublic(pack)}>Удалить</button>
-              )}
-            </div>
-          </div>
-        ))}
+        {publicPacks.map(renderRow)}
       </section>
     </div>
   );
