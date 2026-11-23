@@ -263,18 +263,28 @@ const LibraryPage = () => {
     reload();
   };
 
-  const importFile = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const readFileText = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(file);
+    });
+
+  // Several files at once: each one is added on its own, bad ones are skipped and counted.
+  const importFiles = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async () => {
+    if (files.length === 0) return;
+
+    let added = 0;
+    const skipped: string[] = [];
+    for (const file of files) {
       try {
-        const data = JSON.parse(String(reader.result));
-        const parsed = parseImport(data);
+        const parsed = parseImport(JSON.parse(await readFileText(file)));
         if (!parsed) {
-          setMessage("Этот файл не похож на карту: нужен JSON из библиотеки или из кнопки «Сохранить» в редакторе");
-          return;
+          skipped.push(file.name);
+          continue;
         }
         await putCard({
           id: crypto.randomUUID(),
@@ -285,14 +295,16 @@ const LibraryPage = () => {
           folderId: null,
           thumbnail: parsed.thumbnail,
         });
-        setMessage(`Карта «${parsed.name}» добавлена в библиотеку`);
-        reload();
+        added += 1;
       } catch {
-        setMessage("Не удалось прочитать файл: он повреждён или это не JSON");
+        skipped.push(file.name);
       }
-    };
-    reader.onerror = () => setMessage("Не удалось открыть файл");
-    reader.readAsText(file);
+    }
+
+    const parts = [`Добавлено карт: ${added}`];
+    if (skipped.length) parts.push(`пропущено: ${skipped.length} (${skipped.join(", ")})`);
+    setMessage(parts.join(". "));
+    reload();
   };
 
   // ---- tree rendering
@@ -353,7 +365,8 @@ const LibraryPage = () => {
           ref={fileInput}
           type="file"
           accept=".json,application/json"
-          onChange={importFile}
+          multiple
+          onChange={importFiles}
           className="hidden"
         />
       </div>
