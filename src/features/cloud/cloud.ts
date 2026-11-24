@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { CardRecord, FolderRecord, PageKey } from "../library/db";
+import type { CardRecord, CardSummary, FolderRecord, PageKey } from "../library/db";
 import * as local from "../library/db";
 
 type CardRow = {
@@ -60,9 +60,21 @@ function check<T>(result: { data: T; error: { message: string } | null }): T {
 
 // ---- cards
 
-export async function cloudListCards(): Promise<CardRecord[]> {
-  const rows = check(await supabase.from("cards").select("*"));
-  return (rows as CardRow[]).map(toCard);
+// The list is light: no pictures, no card data. Those are fetched when needed.
+export async function cloudListCards(): Promise<CardSummary[]> {
+  const rows = check(await supabase.from("cards").select("id,page,name,folder_id,saved_at"));
+  return (rows as Omit<CardRow, "form" | "thumbnail">[]).map((r) => ({
+    id: r.id,
+    page: r.page,
+    name: r.name,
+    folderId: r.folder_id,
+    savedAt: Number(r.saved_at),
+  }));
+}
+
+export async function cloudGetThumbnail(id: string): Promise<string | null> {
+  const row = check(await supabase.from("cards").select("thumbnail").eq("id", id).maybeSingle());
+  return ((row as { thumbnail: string | null } | null)?.thumbnail) ?? null;
 }
 
 export async function cloudGetCard(id: string): Promise<CardRecord | undefined> {

@@ -4,19 +4,26 @@ import { supabase } from "../cloud/supabase";
 import * as cloud from "../cloud/cloud";
 import * as local from "./db";
 
-export type { CardRecord, FolderRecord, PageKey } from "./db";
+export type { CardRecord, CardSummary, FolderRecord, PageKey } from "./db";
 
 async function signedIn(): Promise<boolean> {
   const { data } = await supabase.auth.getSession();
   return !!data.session;
 }
 
-export async function listCards() {
+// light list: no pictures
+export async function listCards(): Promise<local.CardSummary[]> {
   return (await signedIn()) ? cloud.cloudListCards() : local.listCards();
 }
 
+// one card in full (form and picture): used when a card is opened or exported
 export async function getCard(id: string) {
   return (await signedIn()) ? cloud.cloudGetCard(id) : local.getCard(id);
+}
+
+// only the small picture of one card
+export async function getThumbnail(id: string): Promise<string | null> {
+  return (await signedIn()) ? cloud.cloudGetThumbnail(id) : local.getThumbnail(id);
 }
 
 export async function putCard(record: local.CardRecord) {

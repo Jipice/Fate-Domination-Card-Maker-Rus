@@ -3,7 +3,10 @@
 import { ChangeEvent, DragEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { FaFolder, FaFolderPlus, FaArrowUp } from "react-icons/fa";
-import type { CardRecord, FolderRecord, PageKey } from "./db";
+import type { CardSummary, FolderRecord, PageKey } from "./db";
+import { LazyThumb } from "./LazyThumb";
+import { getCard } from "./storage";
+import { patchCard, removeCardFromCache } from "./cache";
 import {
   deleteCard,
   deleteFolder,
@@ -227,9 +230,15 @@ const LibraryPage = () => {
 
   // ---- moving things
 
+  // shown at once; the server gets the change in the background
   const moveCardTo = async (cardId: string, folderId: string | null) => {
-    await moveCard(cardId, folderId);
-    reload();
+    patchCard(cardId, { folderId });
+    try {
+      await moveCard(cardId, folderId);
+    } catch {
+      setMessage("Не удалось перенести карту. Список обновлён с сервера.");
+      reload();
+    }
   };
 
   // a folder can go into another folder, but never into itself or into its own subfolders
@@ -258,7 +267,13 @@ const LibraryPage = () => {
 
   // ---- cards
 
-  const exportRecord = (record: CardRecord) => {
+  // the full card (with its picture) is loaded only for export
+  const exportRecord = async (summary: CardSummary) => {
+    const record = await getCard(summary.id);
+    if (!record) {
+      setMessage("Не удалось получить карту для экспорта.");
+      return;
+    }
     const blob = new Blob(
       [JSON.stringify({ format: "fate-card-library", version: 2, record }, null, 2)],
       { type: "application/json" },
@@ -273,10 +288,16 @@ const LibraryPage = () => {
     URL.revokeObjectURL(url);
   };
 
-  const removeRecord = async (record: CardRecord) => {
+  // the card disappears at once; the server deletes it in the background
+  const removeRecord = async (record: CardSummary) => {
     if (!window.confirm(`Удалить «${record.name}» из библиотеки?`)) return;
-    await deleteCard(record.id);
-    reload();
+    removeCardFromCache(record.id);
+    try {
+      await deleteCard(record.id);
+    } catch {
+      setMessage("Не удалось удалить карту. Список обновлён с сервера.");
+      reload();
+    }
   };
 
   const readFileText = (file: File) =>
@@ -463,13 +484,7 @@ const LibraryPage = () => {
             className="flex flex-wrap items-center justify-between gap-3 border border-black rounded p-3 bg-primary-dark-blue cursor-grab"
           >
             <div className="flex items-center gap-3 min-w-0">
-              {record.thumbnail ? (
-                <img src={record.thumbnail} alt="" className="w-16 h-auto rounded border border-black shrink-0" />
-              ) : (
-                <div className="w-16 h-24 rounded border border-dashed border-gray-500 shrink-0 flex items-center justify-center text-xs text-gray-500 text-center">
-                  нет превью
-                </div>
-              )}
+              <LazyThumb id={record.id} className="w-16 shrink-0" />
               <div className="flex flex-col min-w-0">
                 <span className="font-semibold truncate">{record.name}</span>
                 <span className="text-sm text-gray-400">

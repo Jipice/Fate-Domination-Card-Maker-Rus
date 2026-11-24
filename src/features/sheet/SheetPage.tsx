@@ -1,8 +1,9 @@
 "use client";
 
 import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
-import { listCards } from "../library/storage";
-import type { CardRecord } from "../library/db";
+import { listCards, getThumbnail } from "../library/storage";
+import type { CardSummary } from "../library/db";
+import { LazyThumb } from "../library/LazyThumb";
 import ColorInput from "../master-assets/components/ColorInput";
 import type { Color } from "@/src/types/colorTypes";
 
@@ -142,7 +143,7 @@ const ExtraEditorPage = () => {
   const [mode, setMode] = useState<"edit" | "play">("edit");
   const [message, setMessage] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [libCards, setLibCards] = useState<CardRecord[]>([]);
+  const [libCards, setLibCards] = useState<CardSummary[]>([]);
   const [libLoading, setLibLoading] = useState(false);
   const loaded = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -248,7 +249,7 @@ const ExtraEditorPage = () => {
     setMessage("Загружаем карты из библиотеки…");
     try {
       const list = await listCards();
-      setLibCards(list.filter((c) => !!c.thumbnail).sort((a, b) => b.savedAt - a.savedAt));
+      setLibCards(list.sort((a, b) => b.savedAt - a.savedAt));
       setMessage(null);
     } catch {
       setMessage("Не удалось загрузить библиотеку.");
@@ -257,12 +258,16 @@ const ExtraEditorPage = () => {
     }
   };
 
-  const chooseLibraryCard = async (record: CardRecord) => {
-    if (!record.thumbnail) return;
+  const chooseLibraryCard = async (record: CardSummary) => {
     setMessage(`Загружаем картинку «${record.name}»…`);
     try {
-      const size = await sizeOf(record.thumbnail);
-      setPicture(record.thumbnail, size.width, size.height);
+      const thumb = await getThumbnail(record.id);
+      if (!thumb) {
+        setMessage(`У карты «${record.name}» нет превью.`);
+        return;
+      }
+      const size = await sizeOf(thumb);
+      setPicture(thumb, size.width, size.height);
       setPickerOpen(false);
       setMessage(`Картинка: «${record.name}».`);
     } catch (err) {
@@ -602,7 +607,7 @@ const ExtraEditorPage = () => {
               {!libLoading && libCards.length === 0 && <p className="italic text-gray-400">В библиотеке нет карт с превью.</p>}
               {libCards.map((record) => (
                 <button key={record.id} className="flex flex-col items-center gap-1 w-28" onClick={() => chooseLibraryCard(record)}>
-                  <img src={record.thumbnail as string} alt="" className="w-24 h-auto rounded border border-black" />
+                  <LazyThumb id={record.id} className="w-24 shrink-0" />
                   <span className="text-xs truncate w-full">{record.name}</span>
                 </button>
               ))}

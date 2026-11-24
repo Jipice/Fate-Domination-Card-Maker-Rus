@@ -19,6 +19,9 @@ export type CardRecord = {
   thumbnail?: string | null; // small PNG data URL of the card
 };
 
+// a card without its picture and form, used for lists
+export type CardSummary = Omit<CardRecord, "form" | "thumbnail">;
+
 export type FolderRecord = {
   id: string;
   name: string;
@@ -79,6 +82,11 @@ export async function deleteCard(id: string): Promise<void> {
 
 export async function listCards(): Promise<CardRecord[]> {
   return run<CardRecord[]>(CARDS, "readonly", (store) => store.getAll());
+}
+
+export async function getThumbnail(id: string): Promise<string | null> {
+  const record = await getCard(id);
+  return record?.thumbnail ?? null;
 }
 
 export async function moveCard(id: string, folderId: string | null): Promise<void> {

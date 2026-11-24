@@ -115,7 +115,7 @@ export const SaveToLibraryButton = ({
       if (!record || record.thumbnail || cancelled) return;
       const thumbnail = await makeThumbnail(captureId);
       if (thumbnail && !cancelled) await putCard({ ...record, thumbnail });
-        refreshLibrary().catch(() => {});
+        refreshLibrary({ force: true }).catch(() => {});
     }, 1200); // give the editor time to draw the loaded form
     return () => {
       cancelled = true;
@@ -142,7 +142,7 @@ export const SaveToLibraryButton = ({
         thumbnail,
       };
       await putCard(record);
-      refreshLibrary().catch(() => {});
+      refreshLibrary({ force: true }).catch(() => {});
       // a new save creates a new card; only a card opened from the library is updated in place
       setStatus("saved");
     } catch (error) {

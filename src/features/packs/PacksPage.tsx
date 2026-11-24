@@ -7,8 +7,9 @@ import { CARD_BACK_PRESETS, presetForUrl } from "./cardBacks";
 import { Pack, parseTts } from "./parseTts";
 import { countNonLinkImages, DEFAULT_FIGURE_BASE, DEFAULT_FIGURE_SCALE, toTts } from "./toTts";
 import { makeThumbnail, makeZip } from "./zip";
-import { listCards } from "../library/storage";
-import type { CardRecord } from "../library/db";
+import { listCards, getThumbnail } from "../library/storage";
+import type { CardSummary } from "../library/db";
+import { LazyThumb } from "../library/LazyThumb";
 
 // ---- data shapes
 
@@ -447,7 +448,7 @@ const PacksPage = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [libOpen, setLibOpen] = useState(false);
-  const [libCards, setLibCards] = useState<CardRecord[]>([]);
+  const [libCards, setLibCards] = useState<CardSummary[]>([]);
   const [libCategory, setLibCategory] = useState<string>("");
   // when set, the library window picks a back for a card instead of adding a card
   const [libPick, setLibPick] = useState<((url: string) => void) | null>(null);
@@ -609,20 +610,25 @@ const PacksPage = () => {
   };
 
   // a library card's preview becomes a back
-  const pickBack = (record: CardRecord) => {
-    if (!record.thumbnail) {
+  const pickBack = async (record: CardSummary) => {
+    setMessage(`Загружаем картинку «${record.name}»…`);
+    const thumb = await getThumbnail(record.id).catch(() => null);
+    if (!thumb) {
       setMessage(`У карты «${record.name}» нет превью, поэтому её нельзя взять как рубашку.`);
       return;
     }
-    libPick?.(record.thumbnail);
+    libPick?.(thumb);
     setLibPick(null);
     setLibOpen(false);
+    setMessage(null);
   };
 
   // a library card becomes a card of the pack; its small preview is used as the picture
-  const addFromLibrary = (record: CardRecord) => {
+  const addFromLibrary = async (record: CardSummary) => {
     if (!loaded) return;
-    if (!record.thumbnail) {
+    setMessage(`Загружаем картинку «${record.name}»…`);
+    const thumb = await getThumbnail(record.id).catch(() => null);
+    if (!thumb) {
       setMessage(`У карты «${record.name}» нет превью: откройте её в редакторе и сохраните, тогда она появится в паке.`);
       return;
     }
@@ -632,7 +638,7 @@ const PacksPage = () => {
       ...l,
       categories: l.categories.map((c) =>
         c.id === target
-          ? { ...c, cards: [...c.cards, { id: uid(), name: record.name, face: record.thumbnail as string, back: null }] }
+          ? { ...c, cards: [...c.cards, { id: uid(), name: record.name, face: thumb, back: null }] }
           : c,
       ),
     }));
@@ -921,11 +927,7 @@ const PacksPage = () => {
               {libCards.map((record) => (
                 <div key={record.id} className="flex items-center justify-between gap-3 border border-black rounded p-2">
                   <div className="flex items-center gap-3 min-w-0">
-                    {record.thumbnail ? (
-                      <img src={record.thumbnail} alt="" className="w-12 h-auto rounded border border-black shrink-0" />
-                    ) : (
-                      <div className="w-12 h-16 rounded border border-dashed border-gray-500 shrink-0" />
-                    )}
+                    <LazyThumb id={record.id} className="w-12 shrink-0" />
                     <span className="truncate">{record.name}</span>
                   </div>
                   <button className={buttonClass} onClick={() => (libPick ? pickBack(record) : addFromLibrary(record))}>
