@@ -19,7 +19,7 @@ const menuItems = [
   { label: "Командное Заклинание", icon: IoIosStar, link: "command-seal" },
   { label: "Библиотека", icon: FaSave, link: "library" },
   { label: "Мастерская", icon: FaBoxOpen, link: "packs" },
-  { label: "Лист", icon: FaTable, link: "sheet" },
+  { label: "Доп. Редактор", icon: FaTable, link: "sheet" },
   { label: "Аккаунт", icon: FaUser, link: "account" },
 ];
 

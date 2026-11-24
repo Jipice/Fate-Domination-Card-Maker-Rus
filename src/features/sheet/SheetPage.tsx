@@ -1,6 +1,8 @@
 "use client";
 
-import { ChangeEvent, PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
+import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
+import { listCards } from "../library/storage";
+import type { CardRecord } from "../library/db";
 
 // ---- data
 
@@ -25,27 +27,31 @@ export type SheetEl = {
   counter: boolean; // text only: +/- buttons next to each cell
   locked: boolean; // in play mode the element cannot be changed
   size: number; // check: symbol size
-  url: string; // image
-  rotation: number; // image, degrees
+  url: string; // image element
+  rotation: number; // image element, degrees
 };
 
-type SheetData = {
-  name: string;
+type Board = {
   width: number;
   height: number;
-  background: string;
+  background: string; // picture the board is drawn on (empty = plain paper)
+  naturalW: number; // size of the picture itself
+  naturalH: number;
+  lockRatio: boolean;
   elements: SheetEl[];
 };
 
-const KEY = "fate-sheet-current";
+const KEY = "fate-extra-editor-current";
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const CHECK_SYMBOL: Record<number, string> = { 0: "◌", 1: "○", 2: "●" };
 
-const defaultSheet = (): SheetData => ({
-  name: "Новый лист",
+const defaultBoard = (): Board => ({
   width: 690,
   height: 791,
   background: "",
+  naturalW: 690,
+  naturalH: 791,
+  lockRatio: true,
   elements: [],
 });
 
@@ -81,7 +87,7 @@ function fitValues(el: SheetEl, values: (string | number)[]): (string | number)[
   return Array.from({ length: count }, (_, i) => values[i] ?? fill);
 }
 
-// position of cell i on the sheet
+// position of cell i on the board
 function cellPos(el: SheetEl, i: number) {
   return {
     left: el.x + (i % el.cols) * (el.w + el.gapX),
@@ -89,26 +95,62 @@ function cellPos(el: SheetEl, i: number) {
   };
 }
 
+// a picture from a file, scaled down so it fits the storage in the browser
+function readPicture(file: File, maxSide = 1600): Promise<{ url: string; width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+      const width = Math.round(img.width * scale);
+      const height = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")?.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(objectUrl);
+      resolve({ url: canvas.toDataURL("image/jpeg", 0.9), width, height });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("не удалось открыть картинку"));
+    };
+    img.src = objectUrl;
+  });
+}
+
+// size of a picture given by a link (for library thumbnails)
+function sizeOf(url: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error("не удалось открыть картинку"));
+    img.src = url;
+  });
+}
+
 const buttonClass = "import-export-button bg-blue-500 hover:bg-blue-400 justify-center";
 const dangerClass = "import-export-button bg-gray-700 hover:bg-red-800 justify-center";
 
 // ---- page
 
-const SheetPage = () => {
-  const [sheet, setSheet] = useState<SheetData>(defaultSheet());
+const ExtraEditorPage = () => {
+  const [board, setBoard] = useState<Board>(defaultBoard());
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<"edit" | "play">("edit");
   const [message, setMessage] = useState<string | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [libCards, setLibCards] = useState<CardRecord[]>([]);
   const loaded = useRef(false);
-  const importInput = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  // restore the last sheet, then keep saving every change in this browser
+  // restore the last board, then keep saving every change in this browser
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) {
-        const data = JSON.parse(raw) as SheetData;
-        if (Array.isArray(data.elements)) setSheet(data);
+        const data = JSON.parse(raw) as Board;
+        if (Array.isArray(data.elements)) setBoard(data);
       }
     } catch {
       /* nothing saved or unreadable */
@@ -119,18 +161,18 @@ const SheetPage = () => {
   useEffect(() => {
     if (!loaded.current) return;
     try {
-      localStorage.setItem(KEY, JSON.stringify(sheet));
+      localStorage.setItem(KEY, JSON.stringify(board));
     } catch {
-      /* storage full: the sheet still works, it is just not kept */
+      /* picture too big to keep: the board still works, it is just not remembered */
     }
-  }, [sheet]);
+  }, [board]);
 
-  const current = sheet.elements.find((e) => e.id === selected) ?? null;
+  const current = board.elements.find((e) => e.id === selected) ?? null;
 
   const patchEl = (id: string, patch: Partial<SheetEl>) =>
-    setSheet((s) => ({
-      ...s,
-      elements: s.elements.map((e) => {
+    setBoard((b) => ({
+      ...b,
+      elements: b.elements.map((e) => {
         if (e.id !== id) return e;
         const next = { ...e, ...patch };
         return { ...next, values: fitValues(next, next.values) };
@@ -147,7 +189,6 @@ const SheetPage = () => {
 
   // left click: off <-> on; right click: disabled <-> off
   const clickCheck = (el: SheetEl, i: number, right: boolean) => {
-    if (el.locked && mode === "play") return;
     const v = Number(el.values[i]);
     let next: number;
     if (right) next = v === 0 ? 1 : 0;
@@ -156,14 +197,14 @@ const SheetPage = () => {
   };
 
   const add = (kind: Kind) => {
-    const el = newElement(kind, sheet.elements.length);
-    setSheet((s) => ({ ...s, elements: [...s.elements, el] }));
+    const el = newElement(kind, board.elements.length);
+    setBoard((b) => ({ ...b, elements: [...b.elements, el] }));
     setSelected(el.id);
     setMode("edit");
   };
 
   const remove = (id: string) => {
-    setSheet((s) => ({ ...s, elements: s.elements.filter((e) => e.id !== id) }));
+    setBoard((b) => ({ ...b, elements: b.elements.filter((e) => e.id !== id) }));
     setSelected(null);
   };
 
@@ -186,47 +227,69 @@ const SheetPage = () => {
     window.addEventListener("pointerup", up);
   };
 
-  // ---- saving and loading a sheet file
+  // ---- the picture under the board
 
-  const exportSheet = () => {
-    const blob = new Blob([JSON.stringify({ format: "fate-sheet", version: 1, sheet }, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${sheet.name || "sheet"}.fate-sheet.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  const setPicture = (url: string, width: number, height: number) =>
+    setBoard((b) => ({
+      ...b,
+      background: url,
+      naturalW: width,
+      naturalH: height,
+      width,
+      height,
+    }));
+
+  const pickFromLibrary = async () => {
+    const list = await listCards();
+    setLibCards(list.filter((c) => !!c.thumbnail).sort((a, b) => b.savedAt - a.savedAt));
+    setPickerOpen(true);
   };
 
-  const importSheet = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+  const chooseLibraryCard = async (record: CardRecord) => {
+    if (!record.thumbnail) return;
+    try {
+      const size = await sizeOf(record.thumbnail);
+      setPicture(record.thumbnail, size.width, size.height);
+      setPickerOpen(false);
+      setMessage(`Картинка: «${record.name}».`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Не удалось открыть карту");
+    }
+  };
+
+  const uploadPicture = async (file: File | undefined) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const data = JSON.parse(String(reader.result));
-        const s = data.sheet ?? data;
-        if (!s || !Array.isArray(s.elements)) throw new Error("bad file");
-        setSheet({
-          name: String(s.name ?? "Лист"),
-          width: Number(s.width) || 690,
-          height: Number(s.height) || 791,
-          background: String(s.background ?? ""),
-          elements: s.elements as SheetEl[],
-        });
-        setSelected(null);
-        setMessage("Лист загружен.");
-      } catch {
-        setMessage("Не удалось открыть файл: это не лист.");
-      }
-    };
-    reader.readAsText(file);
+    try {
+      const pic = await readPicture(file);
+      setPicture(pic.url, pic.width, pic.height);
+      setMessage(`Картинка загружена: ${pic.width}×${pic.height}.`);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Не удалось загрузить картинку");
+    }
   };
+
+  const removePicture = () =>
+    setBoard((b) => ({ ...b, background: "", width: 690, height: 791, naturalW: 690, naturalH: 791 }));
+
+  // ---- size and proportions
+
+  // with the ratio locked, changing one side changes the other
+  const setWidth = (value: number) =>
+    setBoard((b) => {
+      if (!Number.isFinite(value) || value <= 0) return b;
+      const height = b.lockRatio ? Math.round(value * (b.height / b.width)) : b.height;
+      return { ...b, width: Math.round(value), height };
+    });
+
+  const setHeight = (value: number) =>
+    setBoard((b) => {
+      if (!Number.isFinite(value) || value <= 0) return b;
+      const width = b.lockRatio ? Math.round(value * (b.width / b.height)) : b.width;
+      return { ...b, height: Math.round(value), width };
+    });
+
+  const useNaturalSize = () =>
+    setBoard((b) => ({ ...b, width: b.naturalW, height: b.naturalH }));
 
   // ---- rendering of one element
 
@@ -290,16 +353,7 @@ const SheetPage = () => {
               disabled={el.locked}
               onChange={(e) => setCell(el, i, e.target.value)}
               className="absolute bg-transparent border-none outline-none"
-              style={{
-                left,
-                top,
-                width: el.w,
-                height: el.h,
-                fontSize: el.font,
-                color: el.color,
-                textAlign: el.align,
-                padding: "0 4px",
-              }}
+              style={{ left, top, width: el.w, height: el.h, fontSize: el.font, color: el.color, textAlign: el.align, padding: "0 4px" }}
             />
             {el.counter && !el.locked && (
               <div className="absolute flex flex-col" style={{ left: left + el.w + 2, top, width: 22, height: el.h }}>
@@ -328,10 +382,10 @@ const SheetPage = () => {
       return (
         <div
           key={`${el.id}-${i}`}
-          onClick={() => clickCheck(el, i, false)}
+          onClick={() => !el.locked && clickCheck(el, i, false)}
           onContextMenu={(e) => {
             e.preventDefault();
-            clickCheck(el, i, true);
+            if (!el.locked) clickCheck(el, i, true);
           }}
           className={`absolute flex items-center justify-center select-none ${el.locked ? "" : "cursor-pointer"}`}
           style={{ left, top, width: el.w, height: el.h, fontSize: el.size, color: el.color }}
@@ -380,53 +434,68 @@ const SheetPage = () => {
 
   // ---- render
 
+  const ratio = board.width / board.height;
+
   return (
     <div className="flex flex-col gap-4 w-full max-w-6xl">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Лист</h1>
+        <h1 className="text-xl font-semibold">Доп. Редактор</h1>
         <div className="flex flex-wrap gap-2">
           <button className={mode === "edit" ? buttonClass : dangerClass} onClick={() => setMode("edit")}>Редактирование</button>
           <button className={mode === "play" ? buttonClass : dangerClass} onClick={() => { setMode("play"); setSelected(null); }}>Игра</button>
         </div>
       </div>
 
+      {/* the picture under everything: a card from the library or any photo */}
+      <div className="flex flex-col gap-2 border border-black rounded p-3 bg-primary-dark-blue">
+        <span className="field-header">Картинка-основа</span>
+        <div className="flex flex-wrap gap-2">
+          <button className={buttonClass} onClick={pickFromLibrary}>Карта из библиотеки</button>
+          <button className={buttonClass} onClick={() => fileInput.current?.click()}>Загрузить картинку</button>
+          <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; uploadPicture(f); }} />
+          {board.background && <button className={dangerClass} onClick={removePicture}>Убрать картинку</button>}
+        </div>
+        {board.background && (
+          <div className="flex flex-wrap items-center gap-2">
+            <img src={board.background} alt="" className="w-16 h-auto rounded border border-black" />
+            <span className="text-sm text-gray-400">Исходный размер: {board.naturalW}×{board.naturalH}</span>
+            <button className={buttonClass} onClick={useNaturalSize}>Как у картинки</button>
+          </div>
+        )}
+      </div>
+
+      {/* resolution and proportions */}
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="field-header">Ширина</span>
+          <input type="number" className="w-28" value={board.width} onChange={(e) => setWidth(Number(e.target.value))} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="field-header">Высота</span>
+          <input type="number" className="w-28" value={board.height} onChange={(e) => setHeight(Number(e.target.value))} />
+        </label>
+        <label className="flex items-center gap-2 pb-2 text-sm">
+          <input type="checkbox" checked={board.lockRatio} onChange={(e) => setBoard((b) => ({ ...b, lockRatio: e.target.checked }))} />
+          Сохранять пропорции
+        </label>
+        <span className="pb-2 text-sm text-gray-400">Соотношение: {ratio.toFixed(3)}</span>
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <button className={buttonClass} onClick={() => add("text")}>Текст</button>
         <button className={buttonClass} onClick={() => add("check")}>Чекбокс</button>
         <button className={buttonClass} onClick={() => add("image")}>Картинка</button>
-        <button className={buttonClass} onClick={exportSheet}>Скачать лист</button>
-        <button className={buttonClass} onClick={() => importInput.current?.click()}>Открыть файл</button>
-        <input ref={importInput} type="file" accept=".json,application/json" onChange={importSheet} className="hidden" />
         <button
           className={dangerClass}
           onClick={() => {
-            if (window.confirm("Очистить лист?")) {
-              setSheet(defaultSheet());
+            if (window.confirm("Очистить всё на листе? Картинка-основа тоже уберётся.")) {
+              setBoard(defaultBoard());
               setSelected(null);
             }
           }}
         >
           Очистить
         </button>
-      </div>
-
-      <div className="flex flex-wrap gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="field-header">Название</span>
-          <input type="text" value={sheet.name} onChange={(e) => setSheet((s) => ({ ...s, name: e.target.value }))} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="field-header">Ширина</span>
-          <input type="number" className="w-28" value={sheet.width} onChange={(e) => setSheet((s) => ({ ...s, width: Number(e.target.value) || s.width }))} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="field-header">Высота</span>
-          <input type="number" className="w-28" value={sheet.height} onChange={(e) => setSheet((s) => ({ ...s, height: Number(e.target.value) || s.height }))} />
-        </label>
-        <label className="flex flex-col gap-1 flex-1 min-w-[16rem]">
-          <span className="field-header">Фон (ссылка на картинку, необязательно)</span>
-          <input type="text" value={sheet.background} placeholder="https://..." onChange={(e) => setSheet((s) => ({ ...s, background: e.target.value.trim() }))} />
-        </label>
       </div>
 
       {message && <p className="italic">{message}</p>}
@@ -437,15 +506,14 @@ const SheetPage = () => {
             className="relative shadow-lg"
             onPointerDown={() => setSelected(null)}
             style={{
-              width: sheet.width,
-              height: sheet.height,
+              width: board.width,
+              height: board.height,
               backgroundColor: "#f5f1e6",
-              backgroundImage: sheet.background ? `url("${sheet.background}")` : undefined,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
+              backgroundImage: board.background ? `url("${board.background}")` : undefined,
+              backgroundSize: "100% 100%",
             }}
           >
-            {sheet.elements.map((el) => renderEl(el))}
+            {board.elements.map((el) => renderEl(el))}
           </div>
         </div>
 
@@ -507,12 +575,31 @@ const SheetPage = () => {
         )}
       </div>
 
+      {pickerOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPickerOpen(false)}>
+          <div className="flex flex-col gap-3 w-full max-w-3xl max-h-[85vh] bg-primary-dark-blue border border-black rounded p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold">Выберите карту из библиотеки</h2>
+              <button className={dangerClass} onClick={() => setPickerOpen(false)}>Закрыть</button>
+            </div>
+            <div className="overflow-y-auto flex flex-wrap gap-3">
+              {libCards.length === 0 && <p className="italic text-gray-400">В библиотеке нет карт с превью.</p>}
+              {libCards.map((record) => (
+                <button key={record.id} className="flex flex-col items-center gap-1 w-28" onClick={() => chooseLibraryCard(record)}>
+                  <img src={record.thumbnail as string} alt="" className="w-24 h-auto rounded border border-black" />
+                  <span className="text-xs truncate w-full">{record.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="text-xs text-gray-400">
-        Режим «Игра»: в тексте заполняйте значения и жмите +/−, чекбоксы ставятся левым кликом (правый — «отключить»).
-        Закрытые элементы в игре нельзя менять.
+        Картинка из библиотеки берётся из превью карты (около 225×315). Для большого размера загрузите картинку файлом.
       </p>
     </div>
   );
 };
 
-export default SheetPage;
+export default ExtraEditorPage;
