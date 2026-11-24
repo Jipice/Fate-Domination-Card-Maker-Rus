@@ -3,6 +3,8 @@
 import { PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from "react";
 import { listCards } from "../library/storage";
 import type { CardRecord } from "../library/db";
+import ColorInput from "../master-assets/components/ColorInput";
+import type { Color } from "@/src/types/colorTypes";
 
 // ---- data
 
@@ -23,7 +25,7 @@ export type SheetEl = {
   values: (string | number)[]; // text: one string per cell; check: 0 disabled, 1 off, 2 on
   font: number;
   align: "left" | "center" | "right";
-  color: string;
+  color: string; // "#rrggbb", picked with the paint-bucket picker
   counter: boolean; // text only: +/- buttons next to each cell
   locked: boolean; // in play mode the element cannot be changed
   size: number; // check: symbol size
@@ -141,6 +143,7 @@ const ExtraEditorPage = () => {
   const [message, setMessage] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [libCards, setLibCards] = useState<CardRecord[]>([]);
+  const [libLoading, setLibLoading] = useState(false);
   const loaded = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -240,13 +243,23 @@ const ExtraEditorPage = () => {
     }));
 
   const pickFromLibrary = async () => {
-    const list = await listCards();
-    setLibCards(list.filter((c) => !!c.thumbnail).sort((a, b) => b.savedAt - a.savedAt));
     setPickerOpen(true);
+    setLibLoading(true);
+    setMessage("Загружаем карты из библиотеки…");
+    try {
+      const list = await listCards();
+      setLibCards(list.filter((c) => !!c.thumbnail).sort((a, b) => b.savedAt - a.savedAt));
+      setMessage(null);
+    } catch {
+      setMessage("Не удалось загрузить библиотеку.");
+    } finally {
+      setLibLoading(false);
+    }
   };
 
   const chooseLibraryCard = async (record: CardRecord) => {
     if (!record.thumbnail) return;
+    setMessage(`Загружаем картинку «${record.name}»…`);
     try {
       const size = await sizeOf(record.thumbnail);
       setPicture(record.thumbnail, size.width, size.height);
@@ -450,7 +463,9 @@ const ExtraEditorPage = () => {
       <div className="flex flex-col gap-2 border border-black rounded p-3 bg-primary-dark-blue">
         <span className="field-header">Картинка-основа</span>
         <div className="flex flex-wrap gap-2">
-          <button className={buttonClass} onClick={pickFromLibrary}>Карта из библиотеки</button>
+          <button className={buttonClass} onClick={pickFromLibrary} disabled={libLoading}>
+            {libLoading ? "Загружаем…" : "Карта из библиотеки"}
+          </button>
           <button className={buttonClass} onClick={() => fileInput.current?.click()}>Загрузить картинку</button>
           <input ref={fileInput} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; uploadPicture(f); }} />
           {board.background && <button className={dangerClass} onClick={removePicture}>Убрать картинку</button>}
@@ -544,7 +559,7 @@ const ExtraEditorPage = () => {
                 {current.kind === "text" && (
                   <>
                     {numField("Размер шрифта", "font")}
-                    {textField("Цвет", "color")}
+                    <ColorInput label="Цвет" value={current.color as Color} handleValue={(c) => patchEl(current.id, { color: c })} />
                     <label className="flex items-center justify-between gap-2 text-sm">
                       <span>Выравнивание</span>
                       <select value={current.align} onChange={(e) => patchEl(current.id, { align: e.target.value as SheetEl["align"] })}>
@@ -559,7 +574,7 @@ const ExtraEditorPage = () => {
                 {current.kind === "check" && (
                   <>
                     {numField("Размер символа", "size")}
-                    {textField("Цвет", "color")}
+                    <ColorInput label="Цвет" value={current.color as Color} handleValue={(c) => patchEl(current.id, { color: c })} />
                   </>
                 )}
                 {current.kind === "image" && (
@@ -583,7 +598,8 @@ const ExtraEditorPage = () => {
               <button className={dangerClass} onClick={() => setPickerOpen(false)}>Закрыть</button>
             </div>
             <div className="overflow-y-auto flex flex-wrap gap-3">
-              {libCards.length === 0 && <p className="italic text-gray-400">В библиотеке нет карт с превью.</p>}
+              {libLoading && <p className="italic text-gray-400">Загружаем карты…</p>}
+              {!libLoading && libCards.length === 0 && <p className="italic text-gray-400">В библиотеке нет карт с превью.</p>}
               {libCards.map((record) => (
                 <button key={record.id} className="flex flex-col items-center gap-1 w-28" onClick={() => chooseLibraryCard(record)}>
                   <img src={record.thumbnail as string} alt="" className="w-24 h-auto rounded border border-black" />

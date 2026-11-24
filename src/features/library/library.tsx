@@ -49,7 +49,7 @@ async function makeThumbnail(elementId: string): Promise<string | null> {
   if (!element) return null;
   try {
     const result = await snapdom(element);
-    const blob = await result.toBlob({ type: "png", scale: 0.3 });
+    const blob = await result.toBlob({ type: "png", scale: 0.6 });
     return await blobToDataUrl(blob);
   } catch (error) {
     console.error(error);

@@ -29,7 +29,7 @@ export const FurinaChibi = ({ onToggle }: { onToggle: () => void }) => {
       alt=""
       onClick={onClick}
       draggable={false}
-      className="fixed top-3 right-3 w-16 h-auto z-20 cursor-pointer select-none hidden md:block"
+      className="fixed top-2 right-2 w-12 h-auto z-20 cursor-pointer select-none hidden md:block"
     />
   );
 };
