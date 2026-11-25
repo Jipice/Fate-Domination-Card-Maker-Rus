@@ -5,6 +5,7 @@ import Link from "next/link";
 import { FaFolder, FaFolderPlus, FaArrowUp } from "react-icons/fa";
 import type { CardSummary, FolderRecord, PageKey } from "./db";
 import { LazyThumb } from "./LazyThumb";
+import { withBusy } from "../ui/busy";
 import { getCard } from "./storage";
 import { patchCard, removeCardFromCache } from "./cache";
 import {
@@ -128,7 +129,7 @@ const LibraryPage = () => {
   // any refresh (here, in the sidebar, or after a change) updates this page
   const reload = async () => {
     try {
-      await refreshLibrary();
+      await withBusy(() => refreshLibrary({ force: true }));
     } catch (err) {
       setMessage(err instanceof Error ? `Не удалось обновить библиотеку: ${err.message}` : "Не удалось обновить библиотеку");
     }
@@ -269,7 +270,7 @@ const LibraryPage = () => {
 
   // the full card (with its picture) is loaded only for export
   const exportRecord = async (summary: CardSummary) => {
-    const record = await getCard(summary.id);
+    const record = await withBusy(() => getCard(summary.id));
     if (!record) {
       setMessage("Не удалось получить карту для экспорта.");
       return;

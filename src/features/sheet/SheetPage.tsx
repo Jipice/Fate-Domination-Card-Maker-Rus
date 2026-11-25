@@ -7,11 +7,12 @@ import { LazyThumb } from "../library/LazyThumb";
 import ColorInput from "../master-assets/components/ColorInput";
 import { SaveToLibraryButton, useLibraryLoader } from "../library/library";
 import { sheetToTts } from "./toTtsSheet";
+import { withBusy } from "../ui/busy";
 import type { Color } from "@/src/types/colorTypes";
 
 // ---- data
 
-type Kind = "text" | "check" | "image";
+type Kind = "text" | "check" | "image" | "snap";
 
 export type SheetEl = {
   id: string;
@@ -89,12 +90,13 @@ function newElement(kind: Kind, index: number): SheetEl {
   };
   if (kind === "text") return { ...base, name: "Текст", w: 220, h: 40, values: [""], color: "#ffffff" };
   if (kind === "check") return { ...base, name: "Чекбокс", w: 36, h: 36, values: [1] };
+  if (kind === "snap") return { ...base, name: "Точка", w: 24, h: 24, values: [] };
   return { ...base, name: "Картинка", w: 140, h: 140, values: [] };
 }
 
 // keeps exactly cols*rows values for text and checks
 function fitValues(el: SheetEl, values: (string | number)[]): (string | number)[] {
-  if (el.kind === "image") return [];
+  if (el.kind === "image" || el.kind === "snap") return [];
   const count = el.cols * el.rows;
   const fill = el.kind === "check" ? 1 : "";
   return Array.from({ length: count }, (_, i) => values[i] ?? fill);
@@ -267,7 +269,7 @@ const ExtraEditorPage = () => {
     setLibLoading(true);
     setMessage("Загружаем карты из библиотеки…");
     try {
-      const list = await listCards();
+      const list = await withBusy(() => listCards());
       setLibCards(list.sort((a, b) => b.savedAt - a.savedAt));
       setMessage(null);
     } catch {
@@ -280,7 +282,7 @@ const ExtraEditorPage = () => {
   const chooseLibraryCard = async (record: CardSummary) => {
     setMessage(`Загружаем картинку «${record.name}»…`);
     try {
-      const thumb = await getThumbnail(record.id);
+      const thumb = await withBusy(() => getThumbnail(record.id));
       if (!thumb) {
         setMessage(`У карты «${record.name}» нет превью.`);
         return;
@@ -348,6 +350,20 @@ const ExtraEditorPage = () => {
 
   const renderEl = (el: SheetEl) => {
     const isSelected = selected === el.id && mode === "edit";
+
+    // snap point: where a piece snaps onto the tile in TTS (edit view only)
+    if (el.kind === "snap") {
+      if (mode === "play") return null;
+      return (
+        <div
+          key={el.id}
+          onPointerDown={(e) => startDrag(e, el)}
+          title="Точка прикрепления"
+          className={`absolute rounded-full cursor-move bg-red-500/50 border-2 ${isSelected ? "border-blue-500" : "border-red-600"}`}
+          style={{ left: el.x, top: el.y, width: el.w, height: el.h }}
+        />
+      );
+    }
 
     if (el.kind === "image") {
       return (
@@ -542,6 +558,7 @@ const ExtraEditorPage = () => {
         <button className={buttonClass} onClick={() => add("text")}>Текст</button>
         <button className={buttonClass} onClick={() => add("check")}>Чекбокс</button>
         <button className={buttonClass} onClick={() => add("image")}>Картинка</button>
+        <button className={buttonClass} onClick={() => add("snap")}>Точка прикрепления</button>
         <button
           className={dangerClass}
           onClick={() => {
@@ -600,7 +617,7 @@ const ExtraEditorPage = () => {
               <>
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold">
-                    {current.kind === "text" ? "Текст" : current.kind === "check" ? "Чекбокс" : "Картинка"}
+                    {current.kind === "text" ? "Текст" : current.kind === "check" ? "Чекбокс" : current.kind === "snap" ? "Точка" : "Картинка"}
                   </span>
                   <button className={dangerClass} onClick={() => remove(current.id)}>Удалить</button>
                 </div>
@@ -615,7 +632,7 @@ const ExtraEditorPage = () => {
                 {numField("Y", "y")}
                 {numField("Ширина", "w")}
                 {numField("Высота", "h")}
-                {current.kind !== "image" && (
+                {(current.kind === "text" || current.kind === "check") && (
                   <>
                     {numField("Столбцов", "cols")}
                     {numField("Строк", "rows")}

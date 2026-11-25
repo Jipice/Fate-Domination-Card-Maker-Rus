@@ -8,6 +8,7 @@ import { IoIosStar } from "react-icons/io";
 import { SideBarItem } from "./SideBarItem";
 import { Theme, THEME_KEY, applyTheme } from "./ThemeSwitch";
 import { FurinaChibi } from "./FurinaChibi";
+import { BusyOverlay } from "@/src/features/ui/BusyOverlay";
 import { refreshLibrary, watchLibraryAuth } from "@/src/features/library/cache";
 
 const menuItems = [
@@ -214,6 +215,7 @@ export const SideBar = () => {
       )}
 
       <FurinaChibi onToggle={toggleTheme} />
+      <BusyOverlay />
 
       <div>
         <button

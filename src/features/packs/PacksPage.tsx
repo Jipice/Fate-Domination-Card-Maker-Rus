@@ -10,6 +10,7 @@ import { makeThumbnail, makeZip } from "./zip";
 import { listCards, getThumbnail } from "../library/storage";
 import type { CardSummary } from "../library/db";
 import { LazyThumb } from "../library/LazyThumb";
+import { withBusy } from "../ui/busy";
 
 // ---- data shapes
 
@@ -499,7 +500,7 @@ const PacksPage = () => {
 
   // reload the list when the signed-in person changes, so their hidden packs appear
   useEffect(() => {
-    loadPacks(userId);
+    withBusy(() => loadPacks(userId));
   }, [userId, loadPacks]);
 
   const changeNickname = (value: string) => {
@@ -602,7 +603,7 @@ const PacksPage = () => {
     update((l) => ({ ...l, categories: l.categories.map((c) => (c.id === id ? { ...c, title } : c)) }));
 
   const openLibrary = async (pick?: (url: string) => void) => {
-    const list = await listCards();
+    const list = await withBusy(() => listCards());
     setLibCards(list.sort((a, b) => b.savedAt - a.savedAt));
     setLibCategory((prev) => prev || (loaded?.categories[0]?.id ?? ""));
     setLibPick(pick ? () => pick : null);
@@ -1006,7 +1007,60 @@ const PacksPage = () => {
         </p>
       )}
 
-      {loaded && (
+      {/* someone else's pack: pictures and names only, no links, nothing to change */}
+      {loaded && loaded.readOnly && (
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-wrap items-center gap-4 border border-black rounded p-3 bg-primary-dark-blue">
+            {loaded.cover && <img src={loaded.cover} alt="Картинка пака" className="w-32 h-32 object-cover rounded border border-black" />}
+            <div className="flex flex-col">
+              <span className="text-lg font-semibold">{loaded.name}</span>
+              <span className="text-sm text-gray-400">
+                Карт: {totalCards(loaded)} · категорий: {loaded.categories.length}
+                {loaded.author ? ` · автор: ${loaded.author}` : ""}
+              </span>
+            </div>
+          </div>
+
+          {(loaded.token || loaded.figure) && (
+            <section className="flex flex-col gap-2">
+              <h2 className="font-semibold">Жетон и фигурка</h2>
+              <div className="flex flex-wrap gap-4">
+                {loaded.token && <CardImage src={loaded.token} alt="Жетон" testId="token" onOpen={openZoom} />}
+                {loaded.figure && <CardImage src={loaded.figure} alt="Фигурка" testId="figure" onOpen={openZoom} />}
+              </div>
+            </section>
+          )}
+
+          {loaded.tiles.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h2 className="font-semibold">Плитки</h2>
+              <div className="flex flex-wrap gap-4">
+                {loaded.tiles.map((tile, i) => (
+                  <CardImage key={i} src={tile.image} alt={tile.name} testId="tile" onOpen={openZoom} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {loaded.categories.map((cat) => (
+            <section key={cat.id} className="flex flex-col gap-2">
+              <h2 className="font-semibold">
+                {cat.title} <span className="text-sm text-gray-400">({cat.cards.length})</span>
+              </h2>
+              <div className="flex flex-wrap gap-3">
+                {cat.cards.map((card) => (
+                  <div key={card.id} className="flex flex-col gap-1 items-center">
+                    <CardImage src={card.face} alt={card.name || "Карта"} testId="card" onOpen={openZoom} />
+                    {card.back && <CardImage src={card.back} alt="Рубашка" testId="back" onOpen={openZoom} />}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
+
+      {loaded && !loaded.readOnly && (
         <fieldset disabled={!!loaded.readOnly} className="contents">
           <div className="flex flex-wrap gap-4 border border-black rounded p-3 bg-primary-dark-blue">
             <div className="flex flex-col gap-2 items-start">

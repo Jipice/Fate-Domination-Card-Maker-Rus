@@ -4,7 +4,7 @@
 // The stored board is kept in the object's state, so values are remembered when the game is saved.
 
 export type ExportElement = {
-  kind: "text" | "check" | "image";
+  kind: "text" | "check" | "image" | "snap";
   x: number;
   y: number;
   w: number;
@@ -80,6 +80,8 @@ function onLoad(saved)
 end
 
 function build()
+  -- TTS units per board pixel (the tile is 4 units wide)
+  local K = (self.getScale().x / W) * 1000
   self.clearInputs()
   self.clearButtons()
   inputIndex = {}
@@ -113,9 +115,9 @@ function build()
           value = tostring(vals[k][i] or ""),
           position = pos(px, py),
           rotation = {x = 0, y = 0, z = 0},
-          width = el.w,
-          height = el.h,
-          font_size = el.font,
+          width = el.w * K,
+          height = el.h * K,
+          font_size = el.font * K * 0.6,
           font_color = {r = c.r, g = c.g, b = c.b, a = 1},
           color = bg,
           alignment = 3,
@@ -174,7 +176,7 @@ function build()
           click_function = fname, function_owner = self,
           label = CHECK[tonumber(vals[k][i]) or 1],
           position = pos(px, py), rotation = {x = 0, y = 0, z = 0},
-          width = el.w, height = el.h, font_size = el.size,
+          width = el.w * K, height = el.h * K, font_size = el.size * K * 0.6,
           font_color = {r = c.r, g = c.g, b = c.b, a = 1}, color = {r = 0, g = 0, b = 0, a = 0},
         })
         buttonCount = buttonCount + 1
@@ -200,6 +202,18 @@ export function sheetToTts(board: ExportBoard, imageUrl: string): Record<string,
   const guid = Math.random().toString(16).slice(2, 8);
   const state = JSON.stringify(board);
   const ratio = board.height / board.width;
+  // snap points: where a piece clicks onto the tile (centre of each point, tile is 4 x 4*ratio units)
+  const snapPoints = board.elements
+    .filter((e) => e.kind === "snap")
+    .map((e) => ({
+      Position: {
+        x: ((e.x + e.w / 2) / board.width - 0.5) * 4,
+        y: 0.12,
+        z: ((e.y + e.h / 2) / board.height - 0.5) * 4 * ratio,
+      },
+      Rotation: { x: 0, y: 0, z: 0 },
+      Tags: [],
+    }));
   return {
     SaveName: board.name,
     ObjectStates: [
@@ -221,6 +235,7 @@ export function sheetToTts(board: ExportBoard, imageUrl: string): Record<string,
         },
         LuaScript: LUA,
         LuaScriptState: state,
+        SnapPoints: snapPoints,
       },
     ],
   };

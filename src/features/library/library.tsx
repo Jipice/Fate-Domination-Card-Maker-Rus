@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { CardRecord, PageKey } from "./db";
 import { getCard, putCard } from "./storage";
 import { refreshLibrary } from "./cache";
+import { withBusy } from "../ui/busy";
 
 export type { PageKey, CardRecord } from "./db";
 
@@ -68,7 +69,7 @@ export function useLibraryLoader<T>(
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("library");
     if (!id) return;
-    getCard(id).then((record) => {
+    withBusy(() => getCard(id)).then((record) => {
       if (record && record.page === page) {
         setForm(record.form as T);
         setLibraryId(record.id);
