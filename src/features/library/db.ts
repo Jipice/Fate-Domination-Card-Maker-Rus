@@ -7,7 +7,8 @@ export type PageKey =
   | "master-token"
   | "master-standee"
   | "master-box"
-  | "command-seal";
+  | "command-seal"
+  | "extra-editor";
 
 export type CardRecord = {
   id: string;

@@ -549,7 +549,7 @@ const PacksPage = () => {
         if (!parsed) {
           setLoaded(null);
           setEditingId(null);
-          setMessage("В файле не нашлось коробки. Нужен файл Tabletop Simulator (.json) из папки Documents\\My Games\\Tabletop Simulator\\Saves.");
+          setMessage("В файле не нашлось коробки. Нужен файл Tabletop Simulator (.json) из папки Documents\My Games\Tabletop Simulator\Saves\Saved Objects.");
           return;
         }
         setLoaded(fromParsed(parsed));
@@ -750,12 +750,12 @@ const PacksPage = () => {
         `${fileName}.zip`,
       );
       setMessage(
-        `Скачан архив ${fileName}.zip. Распакуйте оба файла (.json и .png) в Documents\\My Games\\Tabletop Simulator\\Saves\\Saved Objects: картинка станет иконкой в списке.${noTexture}`,
+        `Скачан архив ${fileName}.zip. Распакуйте оба файла (.json и .png) в Documents\My Games\Tabletop Simulator\Saves\\Saved Objects: картинка станет иконкой в списке.${noTexture}`,
       );
     } else {
       saveBlob(new Blob([json as BlobPart], { type: "application/json" }), `${fileName}.json`);
       setMessage(
-        `Скачан файл ${fileName}.json. Положите его в Documents\\My Games\\Tabletop Simulator\\Saves\\Saved Objects. Иконки не будет: у пака нет «Картинки пака».${noTexture}`,
+        `Скачан файл ${fileName}.json. Положите его в Documents\My Games\Tabletop Simulator\Saves\\Saved Objects. Иконки не будет: у пака нет «Картинки пака».${noTexture}`,
       );
     }
   };
@@ -1001,7 +1001,7 @@ const PacksPage = () => {
       {!loaded && (
         <p className="italic text-gray-400">
           Нажмите «Создать пак», чтобы собрать пак прямо на сайте, или загрузите файл Tabletop (.json) из папки{" "}
-          <b>Documents\My Games\Tabletop Simulator\Saves</b> (объекты из Saved Objects лежат в подпапке). Свои паки
+          <b>Documents\My Games\Tabletop Simulator\Saves\Saved Objects</b>. Свои паки
           можно в любой момент открыть из списка ниже и поправить.
         </p>
       )}

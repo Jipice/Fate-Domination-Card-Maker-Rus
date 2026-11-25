@@ -5,6 +5,8 @@ import { listCards, getThumbnail } from "../library/storage";
 import type { CardSummary } from "../library/db";
 import { LazyThumb } from "../library/LazyThumb";
 import ColorInput from "../master-assets/components/ColorInput";
+import { SaveToLibraryButton, useLibraryLoader } from "../library/library";
+import { sheetToTts } from "./toTtsSheet";
 import type { Color } from "@/src/types/colorTypes";
 
 // ---- data
@@ -28,6 +30,8 @@ export type SheetEl = {
   align: "left" | "center" | "right";
   color: string; // "#rrggbb", picked with the paint-bucket picker
   counter: boolean; // text only: +/- buttons next to each cell
+  bgOn: boolean; // background behind text and checkboxes
+  bg: string; // background colour, "#rrggbb"
   locked: boolean; // in play mode the element cannot be changed
   size: number; // check: symbol size
   url: string; // image element
@@ -35,6 +39,7 @@ export type SheetEl = {
 };
 
 type Board = {
+  name: string;
   width: number;
   height: number;
   background: string; // picture the board is drawn on (empty = plain paper)
@@ -47,8 +52,11 @@ type Board = {
 const KEY = "fate-extra-editor-current";
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 const CHECK_SYMBOL: Record<number, string> = { 0: "◌", 1: "○", 2: "●" };
+// a thin dark outline keeps text readable on light and dark pictures alike
+const TEXT_OUTLINE = "0 0 2px #000, 0 0 2px #000, 0 0 1px #000";
 
 const defaultBoard = (): Board => ({
+  name: "Доп. Редактор",
   width: 690,
   height: 791,
   background: "",
@@ -72,12 +80,14 @@ function newElement(kind: Kind, index: number): SheetEl {
     align: "left" as const,
     color: "#000000",
     counter: false,
+    bgOn: true, // a white field behind new text and checkboxes, so they show on any picture
+    bg: "#ffffff",
     locked: false,
     size: 28,
     url: "",
     rotation: 0,
   };
-  if (kind === "text") return { ...base, name: "Текст", w: 220, h: 40, values: [""] };
+  if (kind === "text") return { ...base, name: "Текст", w: 220, h: 40, values: [""], color: "#ffffff" };
   if (kind === "check") return { ...base, name: "Чекбокс", w: 36, h: 36, values: [1] };
   return { ...base, name: "Картинка", w: 140, h: 140, values: [] };
 }
@@ -139,12 +149,15 @@ const dangerClass = "import-export-button bg-gray-700 hover:bg-red-800 justify-c
 
 const ExtraEditorPage = () => {
   const [board, setBoard] = useState<Board>(defaultBoard());
+  // opens a board saved in the library (?library=<id>) and remembers its id for updates
+  const libraryId = useLibraryLoader<Board>("extra-editor", setBoard);
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<"edit" | "play">("edit");
   const [message, setMessage] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [libCards, setLibCards] = useState<CardSummary[]>([]);
   const [libLoading, setLibLoading] = useState(false);
+  const [ttsUrl, setTtsUrl] = useState("");
   const loaded = useRef(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -154,7 +167,13 @@ const ExtraEditorPage = () => {
       const raw = localStorage.getItem(KEY);
       if (raw) {
         const data = JSON.parse(raw) as Board;
-        if (Array.isArray(data.elements)) setBoard(data);
+        if (Array.isArray(data.elements)) {
+          setBoard({
+            ...defaultBoard(),
+            ...data,
+            elements: data.elements.map((e) => ({ ...e, bgOn: !!e.bgOn, bg: e.bg ?? "#ffffff" })),
+          });
+        }
       }
     } catch {
       /* nothing saved or unreadable */
@@ -309,6 +328,22 @@ const ExtraEditorPage = () => {
   const useNaturalSize = () =>
     setBoard((b) => ({ ...b, width: b.naturalW, height: b.naturalH }));
 
+  // ---- export for Tabletop Simulator
+
+  const exportForTts = () => {
+    const obj = sheetToTts(board, ttsUrl);
+    const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${board.name || "sheet"}.tts.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setMessage("Файл для TTS скачан. Положите его в Documents\\My Games\\Tabletop Simulator\\Saves\\Saved Objects.");
+  };
+
   // ---- rendering of one element
 
   const renderEl = (el: SheetEl) => {
@@ -353,13 +388,15 @@ const ExtraEditorPage = () => {
                 height: el.h,
                 fontSize: el.font,
                 color: el.color,
+                backgroundColor: el.bgOn ? el.bg : undefined,
                 justifyContent: el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start",
                 padding: "0 4px",
                 overflow: "hidden",
                 whiteSpace: "nowrap",
+                textShadow: TEXT_OUTLINE,
               }}
             >
-              {String(value ?? "")}
+              {value ? String(value) : <span className="opacity-50">{el.name}</span>}
             </div>
           );
         }
@@ -371,7 +408,7 @@ const ExtraEditorPage = () => {
               disabled={el.locked}
               onChange={(e) => setCell(el, i, e.target.value)}
               className="absolute bg-transparent border-none outline-none"
-              style={{ left, top, width: el.w, height: el.h, fontSize: el.font, color: el.color, textAlign: el.align, padding: "0 4px" }}
+              style={{ left, top, width: el.w, height: el.h, fontSize: el.font, color: el.color, textAlign: el.align, padding: "0 4px", textShadow: TEXT_OUTLINE, backgroundColor: el.bgOn ? el.bg : undefined }}
             />
             {el.counter && !el.locked && (
               <div className="absolute flex flex-col" style={{ left: left + el.w + 2, top, width: 22, height: el.h }}>
@@ -391,7 +428,7 @@ const ExtraEditorPage = () => {
             key={`${el.id}-${i}`}
             onPointerDown={(e) => startDrag(e, el)}
             className={`absolute cursor-move flex items-center justify-center border ${isSelected ? "border-blue-500 border-2" : "border-dashed border-gray-400"}`}
-            style={{ left, top, width: el.w, height: el.h, fontSize: el.size, color: el.color }}
+            style={{ left, top, width: el.w, height: el.h, fontSize: el.size, color: el.color, backgroundColor: el.bgOn ? el.bg : undefined }}
           >
             {CHECK_SYMBOL[v] ?? "○"}
           </div>
@@ -406,7 +443,7 @@ const ExtraEditorPage = () => {
             if (!el.locked) clickCheck(el, i, true);
           }}
           className={`absolute flex items-center justify-center select-none ${el.locked ? "" : "cursor-pointer"}`}
-          style={{ left, top, width: el.w, height: el.h, fontSize: el.size, color: el.color }}
+          style={{ left, top, width: el.w, height: el.h, fontSize: el.size, color: el.color, backgroundColor: el.bgOn ? el.bg : undefined }}
         >
           {CHECK_SYMBOL[v] ?? "○"}
         </div>
@@ -442,7 +479,7 @@ const ExtraEditorPage = () => {
       </label>
     );
 
-  const toggleField = (label: string, key: "counter" | "locked") =>
+  const toggleField = (label: string, key: "counter" | "locked" | "bgOn") =>
     current && (
       <label className="flex items-center justify-between gap-2 text-sm">
         <span>{label}</span>
@@ -518,11 +555,30 @@ const ExtraEditorPage = () => {
         </button>
       </div>
 
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="field-header">Название</span>
+          <input type="text" value={board.name} onChange={(e) => setBoard((b) => ({ ...b, name: e.target.value }))} />
+        </label>
+        <SaveToLibraryButton page="extra-editor" name={board.name} getForm={() => board} libraryId={libraryId} captureId="extra-board-canvas" />
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 flex-1 min-w-[16rem]">
+          <span className="field-header">Ссылка на картинку для TTS (нужна для экспорта)</span>
+          <input type="text" value={ttsUrl} placeholder="https://..." onChange={(e) => setTtsUrl(e.target.value.trim())} />
+        </label>
+        <button className={buttonClass} disabled={!/^https?:\/\//.test(ttsUrl)} onClick={exportForTts}>
+          Скачать для TTS
+        </button>
+      </div>
+
       {message && <p className="italic">{message}</p>}
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         <div className="overflow-auto max-w-full">
           <div
+            id="extra-board-canvas"
             className="relative shadow-lg"
             onPointerDown={() => setSelected(null)}
             style={{
@@ -549,6 +605,12 @@ const ExtraEditorPage = () => {
                   <button className={dangerClass} onClick={() => remove(current.id)}>Удалить</button>
                 </div>
                 {textField("Название", "name")}
+                {current.kind === "text" && current.cols * current.rows === 1 && (
+                  <label className="flex items-center justify-between gap-2 text-sm">
+                    <span>Текст</span>
+                    <input type="text" className="w-40" value={String(current.values[0] ?? "")} onChange={(e) => setCell(current, 0, e.target.value)} />
+                  </label>
+                )}
                 {numField("X", "x")}
                 {numField("Y", "y")}
                 {numField("Ширина", "w")}
@@ -565,6 +627,8 @@ const ExtraEditorPage = () => {
                   <>
                     {numField("Размер шрифта", "font")}
                     <ColorInput label="Цвет" value={current.color as Color} handleValue={(c) => patchEl(current.id, { color: c })} />
+                    {toggleField("Фон", "bgOn")}
+                    {current.bgOn && <ColorInput label="Цвет фона" value={current.bg as Color} handleValue={(c) => patchEl(current.id, { bg: c })} />}
                     <label className="flex items-center justify-between gap-2 text-sm">
                       <span>Выравнивание</span>
                       <select value={current.align} onChange={(e) => patchEl(current.id, { align: e.target.value as SheetEl["align"] })}>
@@ -580,6 +644,8 @@ const ExtraEditorPage = () => {
                   <>
                     {numField("Размер символа", "size")}
                     <ColorInput label="Цвет" value={current.color as Color} handleValue={(c) => patchEl(current.id, { color: c })} />
+                    {toggleField("Фон", "bgOn")}
+                    {current.bgOn && <ColorInput label="Цвет фона" value={current.bg as Color} handleValue={(c) => patchEl(current.id, { bg: c })} />}
                   </>
                 )}
                 {current.kind === "image" && (

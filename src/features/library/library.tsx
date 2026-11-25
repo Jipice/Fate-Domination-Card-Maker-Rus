@@ -16,6 +16,7 @@ export const PAGE_INFO: Record<PageKey, { label: string; path: string }> = {
   "master-standee": { label: "Фигурка мастера", path: "/master-standee" },
   "master-box": { label: "Коробка мастера", path: "/master-box" },
   "command-seal": { label: "Командное заклинание", path: "/command-seal" },
+  "extra-editor": { label: "Доп. Редактор", path: "/sheet" },
 };
 
 // Blob URLs (from the cropper) do not survive a reload, so store them as data URLs.
@@ -44,7 +45,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 // Small picture of the card for the library list. Returns null if capture fails.
-async function makeThumbnail(elementId: string): Promise<string | null> {
+export async function makeThumbnail(elementId: string): Promise<string | null> {
   const element = document.getElementById(elementId);
   if (!element) return null;
   try {
