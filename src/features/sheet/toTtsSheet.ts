@@ -200,7 +200,14 @@ end
 
 export function sheetToTts(board: ExportBoard, imageUrl: string): Record<string, unknown> {
   const guid = Math.random().toString(16).slice(2, 8);
-  const state = JSON.stringify(board);
+  // The state goes into the object, so keep it small: no picture data (the picture is the tile's link),
+  // and no inline pictures from the elements either.
+  const slim = {
+    ...board,
+    elements: board.elements.map((e) => ({ ...e, url: e.url.startsWith("data:") ? "" : e.url })),
+  } as ExportBoard & Record<string, unknown>;
+  delete (slim as Record<string, unknown>).background;
+  const state = JSON.stringify(slim);
   const ratio = board.height / board.width;
   // snap points: where a piece clicks onto the tile (centre of each point, tile is 4 x 4*ratio units)
   const snapPoints = board.elements
@@ -235,7 +242,7 @@ export function sheetToTts(board: ExportBoard, imageUrl: string): Record<string,
         },
         LuaScript: LUA,
         LuaScriptState: state,
-        SnapPoints: snapPoints,
+        ...(snapPoints.length > 0 ? { SnapPoints: snapPoints } : {}),
       },
     ],
   };
