@@ -210,16 +210,15 @@ export function sheetToTts(board: ExportBoard, imageUrl: string): Record<string,
   const state = JSON.stringify(slim);
   const ratio = board.height / board.width;
   // snap points: where a piece clicks onto the tile (centre of each point, tile is 4 x 4*ratio units)
+  // TTS keeps snap points of an object in AttachedSnapPoints, each one only has a Position
   const snapPoints = board.elements
     .filter((e) => e.kind === "snap")
     .map((e) => ({
       Position: {
         x: ((e.x + e.w / 2) / board.width - 0.5) * 4,
-        y: 0.12,
+        y: 0.2,
         z: ((e.y + e.h / 2) / board.height - 0.5) * 4 * ratio,
       },
-      Rotation: { x: 0, y: 0, z: 0 },
-      Tags: [],
     }));
   return {
     SaveName: board.name,
@@ -242,7 +241,7 @@ export function sheetToTts(board: ExportBoard, imageUrl: string): Record<string,
         },
         LuaScript: LUA,
         LuaScriptState: state,
-        ...(snapPoints.length > 0 ? { SnapPoints: snapPoints } : {}),
+        ...(snapPoints.length > 0 ? { AttachedSnapPoints: snapPoints } : {}),
       },
     ],
   };

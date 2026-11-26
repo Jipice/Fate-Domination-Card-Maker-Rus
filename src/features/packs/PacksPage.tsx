@@ -451,13 +451,13 @@ const PacksPage = () => {
   const [libOpen, setLibOpen] = useState(false);
   const [libCards, setLibCards] = useState<CardSummary[]>([]);
   const [libCategory, setLibCategory] = useState<string>("");
+  // the name the card gets in the game (defaults to the library name)
+  const [libNames, setLibNames] = useState<Record<string, string>>({});
   // when set, the library window picks a back for a card instead of adding a card
   const [libPick, setLibPick] = useState<((url: string) => void) | null>(null);
   const [nickname, setNickname] = useState("");
   const [zoom, setZoom] = useState<{ src: string; alt: string } | null>(null);
   const [scale, setScale] = useState(1);
-  const [tileName, setTileName] = useState("");
-  const [tileImage, setTileImage] = useState("");
 
   // everything public, plus the signed-in person's own packs (including hidden ones)
   const loadPacks = useCallback(async (me: string | null) => {
@@ -639,7 +639,7 @@ const PacksPage = () => {
       ...l,
       categories: l.categories.map((c) =>
         c.id === target
-          ? { ...c, cards: [...c.cards, { id: uid(), name: record.name, face: thumb, back: null }] }
+          ? { ...c, cards: [...c.cards, { id: uid(), name: (libNames[record.id] ?? record.name).trim() || record.name, face: thumb, back: null }] }
           : c,
       ),
     }));
@@ -711,20 +711,6 @@ const PacksPage = () => {
         categories: without.map((c) => (c.id === toId ? { ...c, cards: [...c.cards, moved!] } : c)),
       };
     });
-
-  const addTile = () => {
-    const image = tileImage.trim();
-    if (!isImageSrc(image)) {
-      setMessage("Для плитки нужна ссылка на картинку (начинается с http:// или https://).");
-      return;
-    }
-    update((l) => ({ ...l, tiles: [...l.tiles, { name: tileName.trim() || "Плитка", image }] }));
-    setTileName("");
-    setTileImage("");
-  };
-
-  const removeTile = (index: number) =>
-    update((l) => ({ ...l, tiles: l.tiles.filter((_, i) => i !== index) }));
 
   // ---- saving, publishing, removing
 
@@ -929,7 +915,13 @@ const PacksPage = () => {
                 <div key={record.id} className="flex items-center justify-between gap-3 border border-black rounded p-2">
                   <div className="flex items-center gap-3 min-w-0">
                     <LazyThumb id={record.id} className="w-12 shrink-0" />
-                    <span className="truncate">{record.name}</span>
+                    <input
+                      type="text"
+                      aria-label="Имя карты в игре"
+                      value={libNames[record.id] ?? record.name}
+                      onChange={(e) => setLibNames((n) => ({ ...n, [record.id]: e.target.value }))}
+                      className="min-w-[10rem]"
+                    />
                   </div>
                   <button className={buttonClass} onClick={() => (libPick ? pickBack(record) : addFromLibrary(record))}>
                     {libPick ? "Выбрать" : "Добавить"}
@@ -1120,7 +1112,7 @@ const PacksPage = () => {
                 <span>Виден всем в общем списке (без галочки видите только вы)</span>
               </label>
               <span className="text-sm text-gray-400">
-                Карт: {totalCards(loaded)} · категорий: {loaded.categories.length} · плиток: {loaded.tiles.length}
+                Карт: {totalCards(loaded)} · категорий: {loaded.categories.length}
                 {editingId && " · вы редактируете сохранённый пак"}
               </span>
             </div>
@@ -1228,43 +1220,11 @@ const PacksPage = () => {
             </div>
           </section>
 
-          <section className="flex flex-col gap-2">
-            <h2 className="font-semibold">Плитки</h2>
-            {loaded.tiles.length > 0 && (
-              <div className="flex flex-wrap gap-4">
-                {loaded.tiles.map((tile, i) => (
-                  <div key={i} className="flex flex-col gap-1 items-start">
-                    <CardImage src={tile.image} alt={tile.name} testId="tile" onOpen={openZoom} />
-                    <span className="text-xs text-gray-400">{tile.name}</span>
-                    <button className={dangerClass} onClick={() => removeTile(i)}>Убрать</button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2 items-center">
-              <input
-                type="text"
-                placeholder="Ссылка на картинку плитки"
-                value={tileImage}
-                onChange={(e) => setTileImage(e.target.value)}
-                className="flex-1 min-w-[14rem]"
-              />
-              <input
-                type="text"
-                placeholder="Название (необязательно)"
-                value={tileName}
-                onChange={(e) => setTileName(e.target.value)}
-                className="flex-1 min-w-[10rem]"
-              />
-              <button className={buttonClass} onClick={addTile}>Добавить плитку</button>
-            </div>
-          </section>
-
           <section className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-semibold">Категории</h2>
               <div className="flex flex-wrap gap-2">
-                <button className={buttonClass} onClick={() => openLibrary()}>Добавить из библиотеки</button>
+                <button className={buttonClass} onClick={() => openLibrary()}>Добавить карту из библиотеки</button>
                 <button className={buttonClass} onClick={addCategory}>Добавить категорию</button>
               </div>
             </div>
