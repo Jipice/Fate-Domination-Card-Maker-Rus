@@ -510,7 +510,7 @@ const LibraryPage = () => {
                 Открыть
               </Link>
               <button className={buttonClass} onClick={() => exportRecord(record)}>
-                Экспорт
+                Экспорт для сайта
               </button>
               <button className={dangerClass} onClick={() => removeRecord(record)}>
                 Удалить

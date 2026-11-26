@@ -330,9 +330,39 @@ const ExtraEditorPage = () => {
   const useNaturalSize = () =>
     setBoard((b) => ({ ...b, width: b.naturalW, height: b.naturalH }));
 
+  // ---- export for the site: a library file, loaded back with "Импорт JSON" in the library
+
+  const exportForSite = () => {
+    const record = {
+      id: uid(),
+      page: "extra-editor",
+      name: board.name || "Доп. Редактор",
+      savedAt: Date.now(),
+      form: board,
+      folderId: null,
+      thumbnail: null,
+    };
+    const blob = new Blob([JSON.stringify({ format: "fate-card-library", version: 2, record }, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${board.name || "board"}.library.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setMessage("Файл для сайта скачан. Его можно загрузить в библиотеку кнопкой «Импорт JSON».");
+  };
+
   // ---- export for Tabletop Simulator
 
   const exportForTts = () => {
+    if (!/^https?:\/\//.test(ttsUrl)) {
+      setMessage("Для экспорта для TTS вставьте ссылку на картинку (начинается с https://) в поле ниже.");
+      return;
+    }
     const obj = sheetToTts(board, ttsUrl);
     const blob = new Blob([JSON.stringify(obj, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -585,9 +615,8 @@ const ExtraEditorPage = () => {
           <span className="field-header">Ссылка на картинку для TTS (нужна для экспорта)</span>
           <input type="text" value={ttsUrl} placeholder="https://..." onChange={(e) => setTtsUrl(e.target.value.trim())} />
         </label>
-        <button className={buttonClass} disabled={!/^https?:\/\//.test(ttsUrl)} onClick={exportForTts}>
-          Скачать для TTS
-        </button>
+        <button className={buttonClass} onClick={exportForTts}>Экспорт для TTS</button>
+        <button className={buttonClass} onClick={exportForSite}>Экспорт для сайта</button>
       </div>
 
       {message && <p className="italic">{message}</p>}

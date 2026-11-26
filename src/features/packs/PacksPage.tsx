@@ -569,7 +569,7 @@ const PacksPage = () => {
   const openCopy = (pack: CloudPack) => {
     setLoaded({ ...fromData(pack.data, true), readOnly: true });
     setEditingId(null);
-    setMessage(`Открыт пак «${pack.data.name}» только для просмотра. Скачать его можно кнопкой «Скачать для Tabletop».`);
+    setMessage(`Открыт пак «${pack.data.name}» только для просмотра. Для TTS его можно выгрузить кнопкой «Экспорт для TTS».`);
   };
 
   // your own pack: edit it in place
@@ -888,7 +888,7 @@ const PacksPage = () => {
         ) : (
           <button className={buttonClass} onClick={() => openCopy(pack)}>Открыть</button>
         )}
-        <button className={buttonClass} onClick={() => downloadTts(pack.data)}>Скачать для Tabletop</button>
+        <button className={buttonClass} onClick={() => downloadTts(pack.data)}>Экспорт для TTS</button>
         {isOwner(pack) && (
           <button className={dangerClass} onClick={() => removePack(pack)}>Удалить</button>
         )}
@@ -968,7 +968,7 @@ const PacksPage = () => {
                 className={buttonClass}
                 onClick={() => downloadTts(toData(loaded, nickname.trim() || loaded.author))}
               >
-                Скачать для Tabletop
+                Экспорт для TTS
               </button>
               {loaded.readOnly ? null : email ? (
                 <>
